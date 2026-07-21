@@ -122,39 +122,39 @@ pub fn evaluate<'a>(ast: &'a AST<'a>, id: NodeId) -> Result<LiteralValue<'a>, Ki
 pub fn format_ast(ast: &AST, id: NodeId) -> String {
     let node = ast.get_node(id);
     match node {
-        ExprKind::Literal(lit) =>{
-            match lit{
-                LiteralValue::String(s) => format!("{}",s),
-                LiteralValue::Number(n) => format!("{}",n),
-                LiteralValue::Boolean(b) => format!("{}",b),
-                LiteralValue::Nil => "Nil".to_string()
-            }
-        }
-        ExprKind::Grouping(id) =>{
-            format!("(group ({}))",format_ast(ast,*id))
+        ExprKind::Literal(lit) => match lit {
+            LiteralValue::String(s) => format!("{}", s),
+            LiteralValue::Number(n) => format!("{}", n),
+            LiteralValue::Boolean(b) => format!("{}", b),
+            LiteralValue::Nil => "Nil".to_string(),
+        },
+        ExprKind::Grouping(id) => {
+            format!("(group ({}))", format_ast(ast, *id))
         }
         ExprKind::Binary {
             left,
             operator,
-            right
+            right,
         } => {
-            format!("({} {} {})",operator.lexeme,format_ast(ast,*left),format_ast(ast,*right))
+            format!(
+                "({} {} {})",
+                operator.lexeme,
+                format_ast(ast, *left),
+                format_ast(ast, *right)
+            )
         }
-        ExprKind::Unary {
-            operator,
-            right
-        } => {
-            format!("({}{})",operator.lexeme,format_ast(ast,*right))
+        ExprKind::Unary { operator, right } => {
+            format!("({}{})", operator.lexeme, format_ast(ast, *right))
         }
     }
 }
 
 #[cfg(test)]
 mod test {
-    use std::borrow::Cow;
     use crate::KilnError;
     use crate::core::expr::{AST, ExprKind, LiteralValue, evaluate};
     use crate::core::scanner::{Token, TokenType};
+    use std::borrow::Cow;
 
     #[test]
     fn literal_value_expression_has_expected_result() -> Result<(), KilnError> {
@@ -253,7 +253,6 @@ mod test {
         let left = ast.add_node(ExprKind::Literal(LiteralValue::Number(n)));
         let right = ast.add_node(ExprKind::Literal(LiteralValue::Number(m)));
 
-
         for op in operations {
             let operator = Token {
                 token_type: op.clone(),
@@ -269,24 +268,33 @@ mod test {
             println!("Running {:?} operation", op);
 
             match op {
-                TokenType::Plus => assert_eq!(evaluate(&ast, id)?, LiteralValue::Number(n+m)),
-                TokenType::Minus => assert_eq!(evaluate(&ast, id)?, LiteralValue::Number(n-m)),
-                TokenType::Star => assert_eq!(evaluate(&ast, id)?, LiteralValue::Number(n*m)),
-                TokenType::Slash => assert_eq!(evaluate(&ast, id)?, LiteralValue::Number(n/m)),
-                TokenType::EqualEqual => assert_eq!(evaluate(&ast, id)?, LiteralValue::Boolean(n==m)),
-                TokenType::BangEqual => assert_eq!(evaluate(&ast, id)?, LiteralValue::Boolean(n!=m)),
-                TokenType::LessEqual => assert_eq!(evaluate(&ast, id)?, LiteralValue::Boolean(n<=m)),
-                TokenType::Less => assert_eq!(evaluate(&ast, id)?, LiteralValue::Boolean(n<m)),
-                TokenType::GreaterEqual => assert_eq!(evaluate(&ast, id)?, LiteralValue::Boolean(n>=m)),
-                TokenType::Greater => assert_eq!(evaluate(&ast, id)?, LiteralValue::Boolean(n>m)),
+                TokenType::Plus => assert_eq!(evaluate(&ast, id)?, LiteralValue::Number(n + m)),
+                TokenType::Minus => assert_eq!(evaluate(&ast, id)?, LiteralValue::Number(n - m)),
+                TokenType::Star => assert_eq!(evaluate(&ast, id)?, LiteralValue::Number(n * m)),
+                TokenType::Slash => assert_eq!(evaluate(&ast, id)?, LiteralValue::Number(n / m)),
+                TokenType::EqualEqual => {
+                    assert_eq!(evaluate(&ast, id)?, LiteralValue::Boolean(n == m))
+                }
+                TokenType::BangEqual => {
+                    assert_eq!(evaluate(&ast, id)?, LiteralValue::Boolean(n != m))
+                }
+                TokenType::LessEqual => {
+                    assert_eq!(evaluate(&ast, id)?, LiteralValue::Boolean(n <= m))
+                }
+                TokenType::Less => assert_eq!(evaluate(&ast, id)?, LiteralValue::Boolean(n < m)),
+                TokenType::GreaterEqual => {
+                    assert_eq!(evaluate(&ast, id)?, LiteralValue::Boolean(n >= m))
+                }
+                TokenType::Greater => assert_eq!(evaluate(&ast, id)?, LiteralValue::Boolean(n > m)),
                 _ => {}
             }
             println!("{:?} operation Ok", op);
         }
 
-
         let left = ast.add_node(ExprKind::Literal(LiteralValue::String(Cow::from("Hola"))));
-        let right = ast.add_node(ExprKind::Literal(LiteralValue::String(Cow::from(" Mundo!"))));
+        let right = ast.add_node(ExprKind::Literal(LiteralValue::String(Cow::from(
+            " Mundo!",
+        ))));
         let operator = Token {
             token_type: TokenType::Plus,
             lexeme: "",
@@ -297,7 +305,10 @@ mod test {
             operator,
             right,
         });
-        assert_eq!(evaluate(&ast, id)?, LiteralValue::String(Cow::from("Hola Mundo!")));
+        assert_eq!(
+            evaluate(&ast, id)?,
+            LiteralValue::String(Cow::from("Hola Mundo!"))
+        );
         Ok(())
     }
 }

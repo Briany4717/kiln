@@ -1,10 +1,10 @@
 pub mod core;
 
+use crate::core::AST;
+use crate::core::expr::format_ast;
 use clap::{Error, Parser};
 use core::Scanner;
 use std::fmt::{Display, write};
-use crate::core::AST;
-use crate::core::expr::format_ast;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -71,7 +71,7 @@ fn run(file: &str) -> Result<(), KilnError> {
     let mut ast = AST::new();
     let root = parser.parse(&mut ast)?;
 
-    println!("{}",format_ast(&ast, root));
+    println!("{}", format_ast(&ast, root));
     Ok(())
 }
 

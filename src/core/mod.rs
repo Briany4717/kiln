@@ -1,6 +1,6 @@
 pub mod expr;
-mod scanner;
 pub mod parser;
+mod scanner;
 
+pub(crate) use crate::core::parser::{AST, Parser};
 pub(crate) use crate::core::scanner::Scanner;
-pub(crate) use crate::core::parser::{Parser, AST};
