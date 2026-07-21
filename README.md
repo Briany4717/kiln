@@ -14,7 +14,7 @@ como la base de un lenguaje que busca ser rápido, simple y agradable de usar.
 
 - [x] Lexer / Scanner
 - [x] Parser (AST)
-- [ ] Intérprete tree-walking
+- [x] Intérprete tree-walking
 - [ ] Resolución de variables y scopes
 - [ ] Clases y herencia
 - [ ] Compilador a bytecode
