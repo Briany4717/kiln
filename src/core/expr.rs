@@ -1,4 +1,5 @@
 use crate::KilnError;
+use crate::core::env::Env;
 use crate::core::scanner::{Token, TokenType};
 use std::borrow::Cow;
 
@@ -11,6 +12,7 @@ pub enum LiteralValue<'a> {
 }
 
 pub type NodeId = usize;
+pub type StmtId = usize;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ExprKind<'a> {
@@ -19,44 +21,74 @@ pub enum ExprKind<'a> {
         operator: Token<'a>,
         right: NodeId,
     },
+    Assign {
+        name: Token<'a>,
+        value: NodeId,
+    },
     Unary {
         operator: Token<'a>,
         right: NodeId,
     },
     Grouping(NodeId),
     Literal(LiteralValue<'a>),
+    Variable(Token<'a>),
+}
+
+pub enum Stmt<'a> {
+    Print(NodeId),
+    Expression(NodeId),
+    Var {
+        name: Token<'a>,
+        initializer: Option<NodeId>,
+    },
 }
 
 pub struct AST<'a> {
-    nodes: Vec<ExprKind<'a>>,
+    expressions: Vec<ExprKind<'a>>,
+    statements: Vec<Stmt<'a>>,
 }
 
 impl<'a> AST<'a> {
     pub fn new() -> Self {
         AST {
-            nodes: Vec::with_capacity(256),
+            expressions: Vec::with_capacity(256),
+            statements: Vec::with_capacity(256),
         }
     }
 
     pub fn add_node(&mut self, kind: ExprKind<'a>) -> NodeId {
-        let id = self.nodes.len();
-        self.nodes.push(kind);
+        let id = self.expressions.len();
+        self.expressions.push(kind);
+        id
+    }
+
+    pub fn add_stmt(&mut self, stmt: Stmt<'a>) -> StmtId {
+        let id = self.statements.len();
+        self.statements.push(stmt);
         id
     }
 
     pub fn get_node(&self, id: NodeId) -> &ExprKind<'a> {
-        &self.nodes[id]
+        &self.expressions[id]
+    }
+
+    pub fn get_stmt(&self, id: StmtId) -> &Stmt {
+        &self.statements[id]
     }
 }
 
-pub fn evaluate<'a>(ast: &'a AST<'a>, id: NodeId) -> Result<LiteralValue<'a>, KilnError> {
+pub(crate) fn evaluate<'a>(
+    ast: &AST<'a>,
+    env: &mut Env<'a>,
+    id: NodeId,
+) -> Result<LiteralValue<'a>, KilnError> {
     let node = ast.get_node(id);
 
     match node {
         ExprKind::Literal(val) => Ok(val.clone()),
-        ExprKind::Grouping(child_id) => evaluate(ast, *child_id),
+        ExprKind::Grouping(child_id) => evaluate(ast, env, *child_id),
         ExprKind::Unary { operator, right } => {
-            let right_val = evaluate(ast, *right)?;
+            let right_val = evaluate(ast, env, *right)?;
             match &operator.token_type {
                 TokenType::Minus => match right_val {
                     LiteralValue::Number(n) => Ok(LiteralValue::Number(-n)),
@@ -78,8 +110,8 @@ pub fn evaluate<'a>(ast: &'a AST<'a>, id: NodeId) -> Result<LiteralValue<'a>, Ki
             operator,
             right,
         } => {
-            let left_val = evaluate(ast, *left)?;
-            let right_val = evaluate(ast, *right)?;
+            let left_val = evaluate(ast, env, *left)?;
+            let right_val = evaluate(ast, env, *right)?;
             let operation = &operator.token_type;
             match (left_val, right_val) {
                 (LiteralValue::Number(n), LiteralValue::Number(m)) => match operation {
@@ -116,6 +148,11 @@ pub fn evaluate<'a>(ast: &'a AST<'a>, id: NodeId) -> Result<LiteralValue<'a>, Ki
                 }
             }
         }
+        ExprKind::Variable(tk) => env.get(tk),
+        ExprKind::Assign { name, value } => {
+            let value = evaluate(ast, env, *value)?;
+            env.assign(name, value)
+        }
     }
 }
 
@@ -146,12 +183,15 @@ pub fn format_ast(ast: &AST, id: NodeId) -> String {
         ExprKind::Unary { operator, right } => {
             format!("({}{})", operator.lexeme, format_ast(ast, *right))
         }
+        ExprKind::Variable(tk) => format!("{}", tk.lexeme),
+        ExprKind::Assign { .. } => String::from(""),
     }
 }
 
 #[cfg(test)]
 mod test {
     use crate::KilnError;
+    use crate::core::env::Env;
     use crate::core::expr::{AST, ExprKind, LiteralValue, evaluate};
     use crate::core::scanner::{Token, TokenType};
     use std::borrow::Cow;
@@ -161,7 +201,8 @@ mod test {
         let mut ast = AST::new();
         let id = ast.add_node(ExprKind::Literal(LiteralValue::Number(32.0)));
         let id_ev = ast.add_node(ExprKind::Grouping(id));
-        assert_eq!(evaluate(&ast, id_ev)?, LiteralValue::Number(32.0));
+        let mut env = Env::new();
+        assert_eq!(evaluate(&ast, &mut env, id_ev)?, LiteralValue::Number(32.0));
         Ok(())
     }
 
@@ -177,7 +218,8 @@ mod test {
             },
             right,
         });
-        assert_eq!(evaluate(&ast, id)?, LiteralValue::Number(-32.0));
+        let mut env = Env::new();
+        assert_eq!(evaluate(&ast, &mut env, id)?, LiteralValue::Number(-32.0));
         let right = ast.add_node(ExprKind::Literal(LiteralValue::Boolean(false)));
         let id = ast.add_node(ExprKind::Unary {
             operator: Token {
@@ -187,13 +229,14 @@ mod test {
             },
             right,
         });
-        assert_eq!(evaluate(&ast, id)?, LiteralValue::Boolean(true));
+        assert_eq!(evaluate(&ast, &mut env, id)?, LiteralValue::Boolean(true));
         Ok(())
     }
 
     #[test]
     fn unitary_evaluation_errors_are_displayed() -> Result<(), KilnError> {
         let mut ast = AST::new();
+        let mut env = Env::new();
         let right = ast.add_node(ExprKind::Literal(LiteralValue::Number(32.0)));
         let id = ast.add_node(ExprKind::Unary {
             operator: Token {
@@ -204,7 +247,7 @@ mod test {
             right,
         });
         assert_eq!(
-            evaluate(&ast, id).err(),
+            evaluate(&ast, &mut env, id).err(),
             Some(KilnError::Runtime {
                 message: format!(
                     "Invalid ! operand for {:?} literal",
@@ -222,7 +265,7 @@ mod test {
             right,
         });
         assert_eq!(
-            evaluate(&ast, id).err(),
+            evaluate(&ast, &mut env, id).err(),
             Some(KilnError::Runtime {
                 message: format!(
                     "Invalid - operand for {:?} literal",
@@ -236,6 +279,7 @@ mod test {
     #[test]
     fn binary_expression_evaluation_has_expected_result() -> Result<(), KilnError> {
         let mut ast = AST::new();
+        let mut env = Env::new();
         let operations = vec![
             TokenType::Plus,
             TokenType::Minus,
@@ -268,24 +312,36 @@ mod test {
             println!("Running {:?} operation", op);
 
             match op {
-                TokenType::Plus => assert_eq!(evaluate(&ast, id)?, LiteralValue::Number(n + m)),
-                TokenType::Minus => assert_eq!(evaluate(&ast, id)?, LiteralValue::Number(n - m)),
-                TokenType::Star => assert_eq!(evaluate(&ast, id)?, LiteralValue::Number(n * m)),
-                TokenType::Slash => assert_eq!(evaluate(&ast, id)?, LiteralValue::Number(n / m)),
+                TokenType::Plus => {
+                    assert_eq!(evaluate(&ast, &mut env, id)?, LiteralValue::Number(n + m))
+                }
+                TokenType::Minus => {
+                    assert_eq!(evaluate(&ast, &mut env, id)?, LiteralValue::Number(n - m))
+                }
+                TokenType::Star => {
+                    assert_eq!(evaluate(&ast, &mut env, id)?, LiteralValue::Number(n * m))
+                }
+                TokenType::Slash => {
+                    assert_eq!(evaluate(&ast, &mut env, id)?, LiteralValue::Number(n / m))
+                }
                 TokenType::EqualEqual => {
-                    assert_eq!(evaluate(&ast, id)?, LiteralValue::Boolean(n == m))
+                    assert_eq!(evaluate(&ast, &mut env, id)?, LiteralValue::Boolean(n == m))
                 }
                 TokenType::BangEqual => {
-                    assert_eq!(evaluate(&ast, id)?, LiteralValue::Boolean(n != m))
+                    assert_eq!(evaluate(&ast, &mut env, id)?, LiteralValue::Boolean(n != m))
                 }
                 TokenType::LessEqual => {
-                    assert_eq!(evaluate(&ast, id)?, LiteralValue::Boolean(n <= m))
+                    assert_eq!(evaluate(&ast, &mut env, id)?, LiteralValue::Boolean(n <= m))
                 }
-                TokenType::Less => assert_eq!(evaluate(&ast, id)?, LiteralValue::Boolean(n < m)),
+                TokenType::Less => {
+                    assert_eq!(evaluate(&ast, &mut env, id)?, LiteralValue::Boolean(n < m))
+                }
                 TokenType::GreaterEqual => {
-                    assert_eq!(evaluate(&ast, id)?, LiteralValue::Boolean(n >= m))
+                    assert_eq!(evaluate(&ast, &mut env, id)?, LiteralValue::Boolean(n >= m))
                 }
-                TokenType::Greater => assert_eq!(evaluate(&ast, id)?, LiteralValue::Boolean(n > m)),
+                TokenType::Greater => {
+                    assert_eq!(evaluate(&ast, &mut env, id)?, LiteralValue::Boolean(n > m))
+                }
                 _ => {}
             }
             println!("{:?} operation Ok", op);
@@ -306,7 +362,7 @@ mod test {
             right,
         });
         assert_eq!(
-            evaluate(&ast, id)?,
+            evaluate(&ast, &mut env, id)?,
             LiteralValue::String(Cow::from("Hola Mundo!"))
         );
         Ok(())

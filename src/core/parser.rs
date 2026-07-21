@@ -1,4 +1,5 @@
 pub(crate) use crate::core::expr::{AST, ExprKind, LiteralValue, NodeId};
+use crate::core::expr::{Stmt, StmtId};
 use crate::core::scanner::{Token, TokenType};
 use crate::{KilnError, report_error};
 use std::borrow::Cow;
@@ -13,12 +14,95 @@ impl<'a> Parser<'a> {
         Self { tokens, current: 0 }
     }
 
-    pub(crate) fn parse(&mut self, ast: &mut AST<'a>) -> Result<NodeId, KilnError> {
-        self.expression(ast)
+    pub(crate) fn parse(&mut self, ast: &mut AST<'a>) -> Result<Vec<StmtId>, KilnError> {
+        let mut root_stmt = Vec::new();
+        let mut errors = Vec::new();
+        while !self.is_at_end() {
+            let stmt = self.declaration(ast);
+            match stmt {
+                Ok(s) => {
+                    let new_node = ast.add_stmt(s);
+                    root_stmt.push(new_node);
+                }
+                Err(e) => {
+                    errors.push(e);
+                    self.synchronize()
+                }
+            }
+        }
+        if errors.is_empty() {
+            Ok(root_stmt)
+        } else {
+            Err(KilnError::Multiple(errors))
+        }
     }
 
     fn expression(&mut self, ast: &mut AST<'a>) -> Result<NodeId, KilnError> {
-        self.equality(ast)
+        self.assignment(ast)
+    }
+
+    fn declaration(&mut self, ast: &mut AST<'a>) -> Result<Stmt<'a>, KilnError> {
+        if self.matches(&[TokenType::Let]) {
+            self.var_declaration(ast)
+        } else {
+            self.statement(ast)
+        }
+    }
+
+    fn statement(&mut self, ast: &mut AST<'a>) -> Result<Stmt<'a>, KilnError> {
+        if self.matches(&[TokenType::Print]) {
+            self.print_stmt(ast)
+        } else {
+            self.expression_stmt(ast)
+        }
+    }
+
+    fn print_stmt(&mut self, ast: &mut AST<'a>) -> Result<Stmt<'a>, KilnError> {
+        let val = self.expression(ast)?;
+        self.consume(TokenType::Semicolon, "Expect ';' after value.")?;
+        Ok(Stmt::Print(val))
+    }
+
+    fn var_declaration(&mut self, ast: &mut AST<'a>) -> Result<Stmt<'a>, KilnError> {
+        let name = self.consume_identifier("Expect variable name.")?;
+        let mut initializer = None;
+        if self.matches(&[TokenType::Equal]) {
+            initializer = Some(self.expression(ast)?);
+        }
+
+        self.consume(
+            TokenType::Semicolon,
+            "Expect ';' after variable declaration.",
+        )?;
+        Ok(Stmt::Var { name, initializer })
+    }
+
+    fn expression_stmt(&mut self, ast: &mut AST<'a>) -> Result<Stmt<'a>, KilnError> {
+        let val = self.expression(ast)?;
+        self.consume(TokenType::Semicolon, "Expect ';' after expression.")?;
+        Ok(Stmt::Expression(val))
+    }
+
+    fn assignment(&mut self, ast: &mut AST<'a>) -> Result<NodeId, KilnError> {
+        let expr = self.equality(ast)?;
+        if self.matches(&[TokenType::Equal]) {
+            let equals = self.previous();
+            let value = self.assignment(ast)?;
+
+            let exp_k = ast.get_node(expr);
+            return match exp_k {
+                ExprKind::Variable(tk) => Ok(ast.add_node(ExprKind::Assign {
+                    name: tk.clone(),
+                    value,
+                })),
+                _ => {
+                    let message = "Invalid assignment target.".to_string();
+                    Err(KilnError::Runtime { message })
+                }
+            };
+        }
+
+        Ok(expr)
     }
 
     fn equality(&mut self, ast: &mut AST<'a>) -> Result<NodeId, KilnError> {
@@ -116,6 +200,7 @@ impl<'a> Parser<'a> {
                 self.consume(TokenType::RightParen, "Expected ')' after expression.")?;
                 return Ok(ast.add_node(ExprKind::Grouping(exp)));
             }
+            TokenType::Identifier(_) => expr = ExprKind::Variable(self.previous()),
             _ => {
                 return Err(KilnError::Runtime {
                     message: "Expect expression.".to_string(),
@@ -155,6 +240,20 @@ impl<'a> Parser<'a> {
                     message,
                 ),
             }),
+        }
+    }
+
+    fn consume_identifier(&mut self, message: &str) -> Result<Token<'a>, KilnError> {
+        if matches!(self.peek().token_type, TokenType::Identifier(_)) {
+            Ok(self.advance())
+        } else {
+            Err(KilnError::Runtime {
+                message: report_error(
+                    self.peek().line,
+                    Some(&format!(" at '{}'", self.peek().lexeme)),
+                    message,
+                ),
+            })
         }
     }
 
@@ -200,7 +299,7 @@ impl<'a> Parser<'a> {
                 | TokenType::If
                 | TokenType::Print
                 | TokenType::Return
-                | TokenType::Var
+                | TokenType::Let
                 | TokenType::While => return,
                 _ => {}
             }

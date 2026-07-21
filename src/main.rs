@@ -1,10 +1,10 @@
 pub mod core;
 
 use crate::core::AST;
-use crate::core::expr::format_ast;
-use clap::{Error, Parser};
+use crate::core::interpreter::Interpreter;
+use clap::Parser;
 use core::Scanner;
-use std::fmt::{Display, write};
+use std::fmt::Display;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -21,6 +21,7 @@ enum KilnError {
     UnterminatedString,
     InvalidNumberFormat,
     Runtime { message: String },
+    Multiple(Vec<KilnError>),
 }
 
 impl Display for KilnError {
@@ -36,6 +37,12 @@ impl Display for KilnError {
             KilnError::UnterminatedString => write!(f, "Unterminated string."),
             KilnError::InvalidNumberFormat => write!(f, "Invalid number format."),
             KilnError::Runtime { message } => write!(f, "{}", message),
+            KilnError::Multiple(errors) => {
+                for err in errors {
+                    writeln!(f, "{err}")?;
+                }
+                write!(f, "Multiple errors found during execution.")
+            }
         }
     }
 }
@@ -69,9 +76,9 @@ fn run(file: &str) -> Result<(), KilnError> {
     let tokens = scanner.scan_tokens().map_err(|e| KilnError::from(e))?;
     let mut parser = crate::core::Parser::new(&*tokens);
     let mut ast = AST::new();
-    let root = parser.parse(&mut ast)?;
-
-    println!("{}", format_ast(&ast, root));
+    let stmts = parser.parse(&mut ast)?;
+    let mut interpreter = Interpreter::new();
+    interpreter.interpret(&ast, &*stmts)?;
     Ok(())
 }
 
