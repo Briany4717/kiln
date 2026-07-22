@@ -1,14 +1,20 @@
 use crate::KilnError;
 use crate::core::env::ScopeStack;
+use crate::core::interpreter::is_truthy;
+use crate::core::parser::ensure_int;
 use crate::core::scanner::{Token, TokenType};
 use std::borrow::Cow;
-use crate::core::interpreter::is_truthy;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum LiteralValue<'a> {
     Number(f64),
     String(Cow<'a, str>),
     Boolean(bool),
+    Range {
+        start: i32,
+        end: i32,
+        inclusive: bool,
+    },
     Nil,
 }
 
@@ -22,6 +28,11 @@ pub enum ExprKind<'a> {
         operator: Token<'a>,
         right: ExprId,
     },
+    Range {
+        start: ExprId,
+        end: ExprId,
+        inclusive: bool,
+    },
     Assign {
         name: Token<'a>,
         value: ExprId,
@@ -29,7 +40,7 @@ pub enum ExprKind<'a> {
     Logical {
         left: ExprId,
         operator: Token<'a>,
-        right: ExprId
+        right: ExprId,
     },
     Unary {
         operator: Token<'a>,
@@ -46,12 +57,17 @@ pub enum Stmt<'a> {
     If {
         condition: ExprId,
         then_branch: StmtId,
-        else_branch: Option<StmtId>
+        else_branch: Option<StmtId>,
     },
     Print(ExprId),
-    While{
+    For {
+        variable: Token<'a>,
+        iterable: ExprId,
+        body: StmtId,
+    },
+    While {
         condition: ExprId,
-        body: StmtId
+        body: StmtId,
     },
     Var {
         name: Token<'a>,
@@ -169,18 +185,49 @@ pub(crate) fn evaluate<'a>(
             let value = evaluate(ast, env, *value)?;
             env.assign(name, value)
         }
-        ExprKind::Logical {left,operator,right} => {
-            let left = evaluate(ast,env,*left)?;
+        ExprKind::Logical {
+            left,
+            operator,
+            right,
+        } => {
+            let left = evaluate(ast, env, *left)?;
             match operator.token_type {
                 TokenType::Or => {
-                    if is_truthy(&left)? { return Ok(left) };
+                    if is_truthy(&left)? {
+                        return Ok(left);
+                    };
                 }
                 _ => {
-                    if !is_truthy(&left)? {return Ok(left)};
+                    if !is_truthy(&left)? {
+                        return Ok(left);
+                    };
                 }
             }
-            
-            Ok(evaluate(ast,env,*right)?)
+
+            Ok(evaluate(ast, env, *right)?)
+        }
+        ExprKind::Range {
+            start,
+            end,
+            inclusive,
+        } => {
+            let start_val = evaluate(ast, env, *start)?;
+            let end_val = evaluate(ast, env, *end)?;
+
+            match (start_val, end_val) {
+                (LiteralValue::Number(s), LiteralValue::Number(e)) => {
+                    let start_int = ensure_int(s)?;
+                    let end_int = ensure_int(e)?;
+                    Ok(LiteralValue::Range {
+                        start: start_int,
+                        end: end_int,
+                        inclusive: *inclusive,
+                    })
+                }
+                _ => Err(KilnError::Runtime {
+                    message: "Range operands must be numbers.".to_string(),
+                }),
+            }
         }
     }
 }
@@ -192,8 +239,30 @@ pub fn format_ast(ast: &AST, id: ExprId) -> String {
             LiteralValue::String(s) => format!("{}", s),
             LiteralValue::Number(n) => format!("{}", n),
             LiteralValue::Boolean(b) => format!("{}", b),
+            LiteralValue::Range {
+                start,
+                end,
+                inclusive,
+            } => {
+                if *inclusive {
+                    format!("{start}..={end}")
+                } else {
+                    format!("{start}..{end}")
+                }
+            }
             LiteralValue::Nil => "Nil".to_string(),
         },
+        ExprKind::Range {
+            start,
+            end,
+            inclusive,
+        } => {
+            if *inclusive {
+                format!("{start}..={end}")
+            } else {
+                format!("{start}..{end}")
+            }
+        }
         ExprKind::Grouping(id) => {
             format!("(group ({}))", format_ast(ast, *id))
         }

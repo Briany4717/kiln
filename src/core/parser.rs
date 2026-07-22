@@ -1,4 +1,4 @@
-pub(crate) use crate::core::expr::{AST, ExprKind, LiteralValue, ExprId};
+pub(crate) use crate::core::expr::{AST, ExprId, ExprKind, LiteralValue};
 use crate::core::expr::{Stmt, StmtId};
 use crate::core::scanner::{Token, TokenType};
 use crate::{KilnError, report_error};
@@ -50,11 +50,13 @@ impl<'a> Parser<'a> {
     }
 
     fn statement(&mut self, ast: &mut AST<'a>) -> Result<Stmt<'a>, KilnError> {
-        if self.matches(&[TokenType::If]) {
+        if self.matches(&[TokenType::For]) {
+            self.for_stmt(ast)
+        } else if self.matches(&[TokenType::If]) {
             self.if_stmt(ast)
         } else if self.matches(&[TokenType::Print]) {
             self.print_stmt(ast)
-        } else if self.matches(&[TokenType::While]){
+        } else if self.matches(&[TokenType::While]) {
             self.while_stmt(ast)
         } else if self.matches(&[TokenType::LeftBrace]) {
             Ok(Stmt::Block(self.block(ast)?))
@@ -63,12 +65,26 @@ impl<'a> Parser<'a> {
         }
     }
 
+    fn for_stmt(&mut self, ast: &mut AST<'a>) -> Result<Stmt<'a>, KilnError> {
+        let variable = self.consume_identifier("Expected an identifier.")?;
+        self.consume(TokenType::In, "Expected 'in'.")?;
+
+        let iterable = self.expression(ast)?;
+        let body_stmt = self.statement(ast)?;
+        let body = ast.add_stmt(body_stmt);
+        Ok(Stmt::For {
+            variable,
+            iterable,
+            body,
+        })
+    }
+
     fn if_stmt(&mut self, ast: &mut AST<'a>) -> Result<Stmt<'a>, KilnError> {
         let condition = self.expression(ast)?;
         let stmt = self.statement(ast)?;
         let then_branch = ast.add_stmt(stmt);
         let mut else_branch = None;
-        if self.matches(&[TokenType::Else]){
+        if self.matches(&[TokenType::Else]) {
             let stmt = self.statement(ast)?;
             else_branch = Some(ast.add_stmt(stmt));
         }
@@ -76,7 +92,7 @@ impl<'a> Parser<'a> {
         Ok(Stmt::If {
             condition,
             then_branch,
-            else_branch
+            else_branch,
         })
     }
 
@@ -103,8 +119,8 @@ impl<'a> Parser<'a> {
     fn while_stmt(&mut self, ast: &mut AST<'a>) -> Result<Stmt<'a>, KilnError> {
         let condition = self.expression(ast)?;
         let body_stmt = self.statement(ast)?;
-        let body= ast.add_stmt(body_stmt);
-        Ok(Stmt::While {condition, body})
+        let body = ast.add_stmt(body_stmt);
+        Ok(Stmt::While { condition, body })
     }
 
     fn expression_stmt(&mut self, ast: &mut AST<'a>) -> Result<Stmt<'a>, KilnError> {
@@ -124,22 +140,37 @@ impl<'a> Parser<'a> {
     }
 
     fn assignment(&mut self, ast: &mut AST<'a>) -> Result<ExprId, KilnError> {
-        let expr = self.or(ast)?;
+        let expr = self.range(ast)?;
+
         if self.matches(&[TokenType::Equal]) {
             let _equals = self.previous();
             let value = self.assignment(ast)?;
-
             let exp_k = ast.get_node(expr);
             return match exp_k {
                 ExprKind::Variable(tk) => Ok(ast.add_node(ExprKind::Assign {
                     name: tk.clone(),
                     value,
                 })),
-                _ => {
-                    let message = "Invalid assignment target.".to_string();
-                    Err(KilnError::Runtime { message })
-                }
+                _ => Err(KilnError::Runtime {
+                    message: "Invalid assignment target.".to_string(),
+                }),
             };
+        }
+        Ok(expr)
+    }
+
+    fn range(&mut self, ast: &mut AST<'a>) -> Result<ExprId, KilnError> {
+        let mut expr = self.or(ast)?;
+
+        if self.matches(&[TokenType::DotDot, TokenType::DotDotEqual]) {
+            let op = self.previous().token_type.clone();
+            let right = self.or(ast)?;
+            let inclusive = matches!(op, TokenType::DotDotEqual);
+            expr = ast.add_node(ExprKind::Range {
+                start: expr,
+                end: right,
+                inclusive,
+            });
         }
 
         Ok(expr)
@@ -148,29 +179,29 @@ impl<'a> Parser<'a> {
     fn or(&mut self, ast: &mut AST<'a>) -> Result<ExprId, KilnError> {
         let mut expr = self.and(ast)?;
 
-        while self.matches(&[TokenType::Or]){
+        while self.matches(&[TokenType::Or]) {
             let operator = self.previous();
             let right = self.and(ast)?;
             expr = ast.add_node(ExprKind::Logical {
                 left: expr,
                 operator,
-                right
+                right,
             })
         }
 
-       Ok(expr)
+        Ok(expr)
     }
 
     fn and(&mut self, ast: &mut AST<'a>) -> Result<ExprId, KilnError> {
         let mut expr = self.equality(ast)?;
 
-        while self.matches(&[TokenType::And]){
+        while self.matches(&[TokenType::And]) {
             let operator = self.previous();
             let right = self.equality(ast)?;
             expr = ast.add_node(ExprKind::Logical {
                 left: expr,
                 operator,
-                right
+                right,
             })
         }
 
@@ -260,25 +291,26 @@ impl<'a> Parser<'a> {
                 message: "Invalid token".to_string(),
             });
         }
-        let expr;
-        match self.advance().token_type {
-            TokenType::False => expr = ExprKind::Literal(LiteralValue::Boolean(false)),
-            TokenType::True => expr = ExprKind::Literal(LiteralValue::Boolean(true)),
-            TokenType::Nil => expr = ExprKind::Literal(LiteralValue::Nil),
-            TokenType::Number(n) => expr = ExprKind::Literal(LiteralValue::Number(n)),
-            TokenType::String(s) => expr = ExprKind::Literal(LiteralValue::String(Cow::from(s))),
+
+        let expr = match self.advance().token_type {
+            TokenType::False => ExprKind::Literal(LiteralValue::Boolean(false)),
+            TokenType::True => ExprKind::Literal(LiteralValue::Boolean(true)),
+            TokenType::Nil => ExprKind::Literal(LiteralValue::Nil),
+            TokenType::Number(n) => ExprKind::Literal(LiteralValue::Number(n)),
+            TokenType::String(s) => ExprKind::Literal(LiteralValue::String(Cow::from(s))),
             TokenType::LeftParen => {
                 let exp = self.expression(ast)?;
                 self.consume(TokenType::RightParen, "Expected ')' after expression.")?;
                 return Ok(ast.add_node(ExprKind::Grouping(exp)));
             }
-            TokenType::Identifier(_) => expr = ExprKind::Variable(self.previous()),
+            TokenType::Identifier(_) => ExprKind::Variable(self.previous()),
             _ => {
                 return Err(KilnError::Runtime {
                     message: "Expect expression.".to_string(),
                 });
             }
-        }
+        };
+
         Ok(ast.add_node(expr))
     }
 
@@ -379,6 +411,20 @@ impl<'a> Parser<'a> {
             self.advance();
         }
     }
+}
+
+pub(crate) fn ensure_int(val: f64) -> Result<i32, KilnError> {
+    if val.fract() != 0.0 {
+        let message = String::from("Float has a fractional component and is not a whole integer");
+        return Err(KilnError::Runtime { message });
+    }
+
+    if val < i32::MIN as f64 || val > i32::MAX as f64 || val.is_nan() {
+        let message = String::from("Float is out of bounds for an i32 integer");
+        return Err(KilnError::Runtime { message });
+    }
+
+    Ok(val as i32)
 }
 
 #[cfg(test)]

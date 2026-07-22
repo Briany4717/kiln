@@ -111,7 +111,7 @@ impl<'a> Scanner<'a> {
             '*' => Ok(self.add_token(TokenType::Star)),
             '.' => {
                 let t = if self.matches('.') {
-                    if self.matches('='){
+                    if self.matches('=') {
                         TokenType::DotDotEqual
                     } else {
                         TokenType::DotDot
@@ -120,7 +120,7 @@ impl<'a> Scanner<'a> {
                     TokenType::Dot
                 };
                 Ok(self.add_token(t))
-            },
+            }
             '!' => {
                 let t = if self.matches('=') {
                     TokenType::BangEqual
@@ -201,6 +201,7 @@ impl<'a> Scanner<'a> {
             "fn" => TokenType::Fn,
             "if" => TokenType::If,
             "nil" => TokenType::Nil,
+            "in" => TokenType::In,
             "or" => TokenType::Or,
             "print" => TokenType::Print,
             "return" => TokenType::Return,
@@ -217,7 +218,7 @@ impl<'a> Scanner<'a> {
 
     fn add_number_token(&mut self) -> Result<(), KilnError> {
         while self.peek().is_some() && self.peek().unwrap().is_digit(10) {
-    self.advance();
+            self.advance();
         }
 
         if self.peek() == Some('.') && self.peek_next().is_digit(10) {
@@ -283,7 +284,10 @@ impl<'a> Scanner<'a> {
             return '\0';
         }
 
-        self.source[self.current + 1..].chars().next().unwrap_or('\n')
+        self.source[self.current + 1..]
+            .chars()
+            .next()
+            .unwrap_or('\n')
     }
 
     fn add_token(&mut self, token_type: TokenType<'a>) {
@@ -333,12 +337,11 @@ mod test {
         let scanner = Scanner::new("3.5..5");
         let tokens = scanner.scan_tokens().expect("Todo mal");
         for tk in tokens.clone() {
-            println!("{:?}",tk.token_type)
+            println!("{:?}", tk.token_type)
         }
         assert_eq!(tokens[0].token_type, TokenType::Number(3.5));
         assert_eq!(tokens[1].token_type, TokenType::DotDot);
         assert_eq!(tokens[2].token_type, TokenType::Number(5.0));
-
     }
 
     #[test]

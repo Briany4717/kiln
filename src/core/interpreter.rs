@@ -50,16 +50,55 @@ impl<'a> Interpreter<'a> {
                 }
                 self.env.pop_scope()
             }
-            Stmt::If {condition, then_branch, else_branch} => {
-                if is_truthy(&evaluate(ast,env,*condition)?)? {
+            Stmt::If {
+                condition,
+                then_branch,
+                else_branch,
+            } => {
+                if is_truthy(&evaluate(ast, env, *condition)?)? {
                     self.execute(ast, *then_branch)?;
                 } else if let Some(else_branch) = else_branch {
                     self.execute(ast, *else_branch)?;
                 }
             }
-            Stmt::While {condition, body} => {
-                while is_truthy(&evaluate(ast,&mut self.env, *condition)?)? {
-                    self.execute(ast,*body)?;
+            Stmt::While { condition, body } => {
+                while is_truthy(&evaluate(ast, &mut self.env, *condition)?)? {
+                    self.execute(ast, *body)?;
+                }
+            }
+            Stmt::For {
+                variable,
+                iterable,
+                body,
+            } => {
+                let iterator = evaluate(ast, env, *iterable)?;
+                match iterator {
+                    LiteralValue::Range {
+                        start,
+                        end,
+                        inclusive,
+                    } => {
+                        let iter: Box<dyn Iterator<Item = i32>> = if inclusive {
+                            Box::new(start..=end)
+                        } else {
+                            Box::new(start..end)
+                        };
+
+                        for i in iter {
+                            self.env.push_scope();
+                            self.env
+                                .define(variable.lexeme, LiteralValue::Number(i as f64));
+                            let result = self.execute(ast, *body);
+                            self.env.pop_scope();
+
+                            result?;
+                        }
+                    }
+                    _ => {
+                        return Err(KilnError::Runtime {
+                            message: "Expected an iterable object.".to_string(),
+                        });
+                    }
                 }
             }
         }
@@ -71,19 +110,28 @@ impl<'a> Interpreter<'a> {
             LiteralValue::Number(n) => n.to_string(),
             LiteralValue::String(s) => s.to_string(),
             LiteralValue::Boolean(b) => String::from(if b { "true" } else { "false" }),
+            LiteralValue::Range {
+                start,
+                end,
+                inclusive,
+            } => {
+                if inclusive {
+                    format!("{start}..={end}")
+                } else {
+                    format!("{start}..{end}")
+                }
+            }
             LiteralValue::Nil => String::from("nil"),
         }
     }
-
-
 }
 
-pub(crate) fn is_truthy(val: &LiteralValue) -> Result<bool,KilnError> {
+pub(crate) fn is_truthy(val: &LiteralValue) -> Result<bool, KilnError> {
     match val {
         LiteralValue::Boolean(b) => Ok(*b),
         _ => {
             let message = String::from("Expected boolean expression");
-            Err(KilnError::Runtime {message})
+            Err(KilnError::Runtime { message })
         }
     }
 }
