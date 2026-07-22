@@ -1,15 +1,17 @@
 use crate::KilnError;
 use crate::core::AST;
-use crate::core::env::Env;
+use crate::core::env::ScopeStack;
 use crate::core::expr::{LiteralValue, Stmt, StmtId, evaluate};
 
 pub struct Interpreter<'a> {
-    env: Env<'a>,
+    env: ScopeStack<'a>,
 }
 
 impl<'a> Interpreter<'a> {
     pub fn new() -> Self {
-        Self { env: Env::new() }
+        Self {
+            env: ScopeStack::new(),
+        }
     }
 
     pub(crate) fn interpret(
@@ -40,6 +42,13 @@ impl<'a> Interpreter<'a> {
                 } else {
                     self.env.define(name.lexeme, LiteralValue::Nil)
                 }
+            }
+            Stmt::Block(stmts) => {
+                env.push_scope();
+                for stmt in stmts {
+                    self.execute(ast, *stmt)?;
+                }
+                self.env.pop_scope()
             }
         }
         Ok(())

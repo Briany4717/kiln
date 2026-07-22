@@ -1,5 +1,5 @@
 use crate::KilnError;
-use crate::core::env::Env;
+use crate::core::env::ScopeStack;
 use crate::core::scanner::{Token, TokenType};
 use std::borrow::Cow;
 
@@ -36,6 +36,7 @@ pub enum ExprKind<'a> {
 
 pub enum Stmt<'a> {
     Print(NodeId),
+    Block(Vec<StmtId>),
     Expression(NodeId),
     Var {
         name: Token<'a>,
@@ -72,14 +73,14 @@ impl<'a> AST<'a> {
         &self.expressions[id]
     }
 
-    pub fn get_stmt(&self, id: StmtId) -> &Stmt {
+    pub fn get_stmt(&self, id: StmtId) -> &Stmt<'a> {
         &self.statements[id]
     }
 }
 
 pub(crate) fn evaluate<'a>(
     ast: &AST<'a>,
-    env: &mut Env<'a>,
+    env: &mut ScopeStack<'a>,
     id: NodeId,
 ) -> Result<LiteralValue<'a>, KilnError> {
     let node = ast.get_node(id);
@@ -191,7 +192,7 @@ pub fn format_ast(ast: &AST, id: NodeId) -> String {
 #[cfg(test)]
 mod test {
     use crate::KilnError;
-    use crate::core::env::Env;
+    use crate::core::env::ScopeStack;
     use crate::core::expr::{AST, ExprKind, LiteralValue, evaluate};
     use crate::core::scanner::{Token, TokenType};
     use std::borrow::Cow;
@@ -201,7 +202,7 @@ mod test {
         let mut ast = AST::new();
         let id = ast.add_node(ExprKind::Literal(LiteralValue::Number(32.0)));
         let id_ev = ast.add_node(ExprKind::Grouping(id));
-        let mut env = Env::new();
+        let mut env = ScopeStack::new();
         assert_eq!(evaluate(&ast, &mut env, id_ev)?, LiteralValue::Number(32.0));
         Ok(())
     }
@@ -218,7 +219,7 @@ mod test {
             },
             right,
         });
-        let mut env = Env::new();
+        let mut env = ScopeStack::new();
         assert_eq!(evaluate(&ast, &mut env, id)?, LiteralValue::Number(-32.0));
         let right = ast.add_node(ExprKind::Literal(LiteralValue::Boolean(false)));
         let id = ast.add_node(ExprKind::Unary {
@@ -236,7 +237,7 @@ mod test {
     #[test]
     fn unitary_evaluation_errors_are_displayed() -> Result<(), KilnError> {
         let mut ast = AST::new();
-        let mut env = Env::new();
+        let mut env = ScopeStack::new();
         let right = ast.add_node(ExprKind::Literal(LiteralValue::Number(32.0)));
         let id = ast.add_node(ExprKind::Unary {
             operator: Token {
@@ -279,7 +280,7 @@ mod test {
     #[test]
     fn binary_expression_evaluation_has_expected_result() -> Result<(), KilnError> {
         let mut ast = AST::new();
-        let mut env = Env::new();
+        let mut env = ScopeStack::new();
         let operations = vec![
             TokenType::Plus,
             TokenType::Minus,

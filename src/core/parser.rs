@@ -52,6 +52,8 @@ impl<'a> Parser<'a> {
     fn statement(&mut self, ast: &mut AST<'a>) -> Result<Stmt<'a>, KilnError> {
         if self.matches(&[TokenType::Print]) {
             self.print_stmt(ast)
+        } else if self.matches(&[TokenType::LeftBrace]) {
+            Ok(Stmt::Block(self.block(ast)?))
         } else {
             self.expression_stmt(ast)
         }
@@ -83,10 +85,20 @@ impl<'a> Parser<'a> {
         Ok(Stmt::Expression(val))
     }
 
+    fn block(&mut self, ast: &mut AST<'a>) -> Result<Vec<StmtId>, KilnError> {
+        let mut stmts = Vec::new();
+        while !self.check(&TokenType::RightBrace) && !self.is_at_end() {
+            let stmt = self.declaration(ast)?;
+            stmts.push(ast.add_stmt(stmt));
+        }
+        self.consume(TokenType::RightBrace, "Expect '}' after block.")?;
+        Ok(stmts)
+    }
+
     fn assignment(&mut self, ast: &mut AST<'a>) -> Result<NodeId, KilnError> {
         let expr = self.equality(ast)?;
         if self.matches(&[TokenType::Equal]) {
-            let equals = self.previous();
+            let _equals = self.previous();
             let value = self.assignment(ast)?;
 
             let exp_k = ast.get_node(expr);
