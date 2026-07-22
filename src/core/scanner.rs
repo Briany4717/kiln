@@ -17,6 +17,8 @@ pub enum TokenType<'a> {
     RightBrace,
     Comma,
     Dot,
+    DotDot,
+    DotDotEqual,
     Minus,
     Plus,
     Semicolon,
@@ -43,6 +45,7 @@ pub enum TokenType<'a> {
     For,
     If,
     Nil,
+    In,
     Or,
     Print,
     Return,
@@ -102,11 +105,22 @@ impl<'a> Scanner<'a> {
             '{' => Ok(self.add_token(TokenType::LeftBrace)),
             '}' => Ok(self.add_token(TokenType::RightBrace)),
             ',' => Ok(self.add_token(TokenType::Comma)),
-            '.' => Ok(self.add_token(TokenType::Dot)),
             '-' => Ok(self.add_token(TokenType::Minus)),
             '+' => Ok(self.add_token(TokenType::Plus)),
             ';' => Ok(self.add_token(TokenType::Semicolon)),
             '*' => Ok(self.add_token(TokenType::Star)),
+            '.' => {
+                let t = if self.matches('.') {
+                    if self.matches('='){
+                        TokenType::DotDotEqual
+                    } else {
+                        TokenType::DotDot
+                    }
+                } else {
+                    TokenType::Dot
+                };
+                Ok(self.add_token(t))
+            },
             '!' => {
                 let t = if self.matches('=') {
                     TokenType::BangEqual
@@ -203,7 +217,7 @@ impl<'a> Scanner<'a> {
 
     fn add_number_token(&mut self) -> Result<(), KilnError> {
         while self.peek().is_some() && self.peek().unwrap().is_digit(10) {
-            self.advance();
+    self.advance();
         }
 
         if self.peek() == Some('.') && self.peek_next().is_digit(10) {
@@ -269,7 +283,7 @@ impl<'a> Scanner<'a> {
             return '\0';
         }
 
-        self.source[self.current..].chars().next().unwrap_or('\n')
+        self.source[self.current + 1..].chars().next().unwrap_or('\n')
     }
 
     fn add_token(&mut self, token_type: TokenType<'a>) {
@@ -300,12 +314,31 @@ mod test {
 
     #[test]
     fn multichar_token_is_read() {
-        let scanner = Scanner::new("!=,==.");
+        let scanner = Scanner::new("!=,==..=");
         let tokens = scanner.scan_tokens().expect("Todo mal");
         assert_eq!(tokens[0].token_type, TokenType::BangEqual);
         assert_eq!(tokens[1].token_type, TokenType::Comma);
         assert_eq!(tokens[2].token_type, TokenType::EqualEqual);
-        assert_eq!(tokens[3].token_type, TokenType::Dot);
+        assert_eq!(tokens[3].token_type, TokenType::DotDotEqual);
+    }
+
+    #[test]
+    fn range_distinguishable_from_number() {
+        let scanner = Scanner::new("3..5");
+        let tokens = scanner.scan_tokens().expect("Todo mal");
+        assert_eq!(tokens[0].token_type, TokenType::Number(3.0));
+        assert_eq!(tokens[1].token_type, TokenType::DotDot);
+        assert_eq!(tokens[2].token_type, TokenType::Number(5.0));
+
+        let scanner = Scanner::new("3.5..5");
+        let tokens = scanner.scan_tokens().expect("Todo mal");
+        for tk in tokens.clone() {
+            println!("{:?}",tk.token_type)
+        }
+        assert_eq!(tokens[0].token_type, TokenType::Number(3.5));
+        assert_eq!(tokens[1].token_type, TokenType::DotDot);
+        assert_eq!(tokens[2].token_type, TokenType::Number(5.0));
+
     }
 
     #[test]
@@ -341,5 +374,13 @@ mod test {
         let scanner = Scanner::new("==,\"Hola Mundo\" ,!=");
         let tokens = scanner.scan_tokens().expect("Todo mal");
         assert_eq!(tokens[2].token_type, TokenType::String("Hola Mundo"));
+    }
+
+    #[test]
+    fn number_token_is_read() {
+        let scanner = Scanner::new("==,3 + 4.67 ,!=");
+        let tokens = scanner.scan_tokens().expect("Todo mal");
+        assert_eq!(tokens[2].token_type, TokenType::Number(3.0));
+        assert_eq!(tokens[4].token_type, TokenType::Number(4.67));
     }
 }
