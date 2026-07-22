@@ -54,6 +54,8 @@ impl<'a> Parser<'a> {
             self.if_stmt(ast)
         } else if self.matches(&[TokenType::Print]) {
             self.print_stmt(ast)
+        } else if self.matches(&[TokenType::While]){
+            self.while_stmt(ast)
         } else if self.matches(&[TokenType::LeftBrace]) {
             Ok(Stmt::Block(self.block(ast)?))
         } else {
@@ -96,6 +98,13 @@ impl<'a> Parser<'a> {
             "Expect ';' after variable declaration.",
         )?;
         Ok(Stmt::Var { name, initializer })
+    }
+
+    fn while_stmt(&mut self, ast: &mut AST<'a>) -> Result<Stmt<'a>, KilnError> {
+        let condition = self.expression(ast)?;
+        let body_stmt = self.statement(ast)?;
+        let body= ast.add_stmt(body_stmt);
+        Ok(Stmt::While {condition, body})
     }
 
     fn expression_stmt(&mut self, ast: &mut AST<'a>) -> Result<Stmt<'a>, KilnError> {

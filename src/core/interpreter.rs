@@ -57,6 +57,11 @@ impl<'a> Interpreter<'a> {
                     self.execute(ast, *else_branch)?;
                 }
             }
+            Stmt::While {condition, body} => {
+                while is_truthy(&evaluate(ast,&mut self.env, *condition)?)? {
+                    self.execute(ast,*body)?;
+                }
+            }
         }
         Ok(())
     }
@@ -69,11 +74,11 @@ impl<'a> Interpreter<'a> {
             LiteralValue::Nil => String::from("nil"),
         }
     }
-    
+
 
 }
 
-pub fn is_truthy(val: &LiteralValue) -> Result<bool,KilnError> {
+pub(crate) fn is_truthy(val: &LiteralValue) -> Result<bool,KilnError> {
     match val {
         LiteralValue::Boolean(b) => Ok(*b),
         _ => {

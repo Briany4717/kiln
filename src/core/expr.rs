@@ -49,6 +49,10 @@ pub enum Stmt<'a> {
         else_branch: Option<StmtId>
     },
     Print(ExprId),
+    While{
+        condition: ExprId,
+        body: StmtId
+    },
     Var {
         name: Token<'a>,
         initializer: Option<ExprId>,
