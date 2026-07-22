@@ -1,10 +1,10 @@
 pub mod core;
 
-use crate::core::AST;
 use crate::core::interpreter::Interpreter;
 use clap::Parser;
 use core::Scanner;
 use std::fmt::Display;
+use crate::core::expr::AST;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]

@@ -1,9 +1,11 @@
-use crate::KilnError;
+use crate::{report_error, KilnError};
 use crate::core::env::ScopeStack;
 use crate::core::interpreter::is_truthy;
 use crate::core::parser::ensure_int;
 use crate::core::scanner::{Token, TokenType};
 use std::borrow::Cow;
+use crate::core::kiln_callable::KilnCallable;
+
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum LiteralValue<'a> {
@@ -15,6 +17,7 @@ pub enum LiteralValue<'a> {
         end: i32,
         inclusive: bool,
     },
+    Callable(KilnCallable<'a>),
     Nil,
 }
 
@@ -27,6 +30,11 @@ pub enum ExprKind<'a> {
         left: ExprId,
         operator: Token<'a>,
         right: ExprId,
+    },
+    Call {
+        callee: ExprId,
+        paren: Token<'a>,
+        arguments: Vec<ExprId>
     },
     Range {
         start: ExprId,
@@ -229,8 +237,42 @@ pub(crate) fn evaluate<'a>(
                 }),
             }
         }
+        ExprKind::Call {callee,paren,arguments: expr_args} => {
+            let callee_val = evaluate(ast,env,*callee)?;
+            let mut arguments = Vec::new();
+            for arg in expr_args {
+                arguments.push(evaluate(ast,env,*arg)?);
+            }
+
+            let function = match callee_val {
+                LiteralValue::Callable(func) => func,
+                _ => {
+                    return Err(KilnError::Runtime {
+                        message: report_error(
+                            paren.line,
+                            Some(&format!(" at '{}'", paren.lexeme)),
+                            "Can only call functions and classes.",
+                        ),
+                    });
+                }
+            };
+
+            if arguments.len() != function.arity() {
+                return Err(KilnError::Runtime {
+                    message: report_error(
+                        paren.line,
+                        Some(&format!(" at '{}'", paren.lexeme)),
+                        &format!("Expected {} arguments but got {} instead.", function.arity(),arguments.len()),
+                    ),
+                });
+            }
+
+            function.call(&arguments)
+
+        }
     }
 }
+
 
 pub fn format_ast(ast: &AST, id: ExprId) -> String {
     let node = ast.get_node(id);
@@ -251,6 +293,7 @@ pub fn format_ast(ast: &AST, id: ExprId) -> String {
                 }
             }
             LiteralValue::Nil => "Nil".to_string(),
+            _ => {todo!()}
         },
         ExprKind::Range {
             start,
@@ -283,7 +326,7 @@ pub fn format_ast(ast: &AST, id: ExprId) -> String {
         }
         ExprKind::Variable(tk) => format!("{}", tk.lexeme),
         ExprKind::Assign { .. } => String::from(""),
-        ExprKind::Logical { .. } => todo!(),
+        _ => todo!(),
     }
 }
 

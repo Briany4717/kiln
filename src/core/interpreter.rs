@@ -1,22 +1,30 @@
+use std::time::{SystemTime, UNIX_EPOCH};
 use crate::KilnError;
-use crate::core::AST;
 use crate::core::env::ScopeStack;
-use crate::core::expr::{LiteralValue, Stmt, StmtId, evaluate};
-
+use crate::core::expr::{LiteralValue, Stmt, StmtId, evaluate, AST};
+use crate::core::kiln_callable::KilnCallable;
 pub struct Interpreter<'a> {
     env: ScopeStack<'a>,
 }
 
 impl<'a> Interpreter<'a> {
     pub fn new() -> Self {
+        let mut env = ScopeStack::new();
+
+        env.define_global("clock", LiteralValue::Callable(KilnCallable::Native {
+            arity: 0,
+            name: "clock",
+            func: |_args|{Ok(LiteralValue::Number(SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis() as f64))},
+        }));
+
         Self {
-            env: ScopeStack::new(),
+            env
         }
     }
 
     pub(crate) fn interpret(
         &mut self,
-        ast: &'a AST,
+        ast: &AST<'a>,
         statements: &[StmtId],
     ) -> Result<(), KilnError> {
         for stmt_id in statements {
@@ -25,7 +33,7 @@ impl<'a> Interpreter<'a> {
         Ok(())
     }
 
-    fn execute(&mut self, ast: &'a AST, stmt_id: StmtId) -> Result<(), KilnError> {
+    fn execute(&mut self, ast: &AST<'a>, stmt_id: StmtId) -> Result<(), KilnError> {
         let env = &mut self.env;
         match ast.get_stmt(stmt_id) {
             Stmt::Print(id) => {
@@ -122,6 +130,7 @@ impl<'a> Interpreter<'a> {
                 }
             }
             LiteralValue::Nil => String::from("nil"),
+            _ => {todo!()}
         }
     }
 }

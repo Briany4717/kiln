@@ -1,5 +1,4 @@
-pub(crate) use crate::core::expr::{AST, ExprId, ExprKind, LiteralValue};
-use crate::core::expr::{Stmt, StmtId};
+use crate::core::expr::{Stmt, StmtId, AST, LiteralValue, ExprId, ExprKind};
 use crate::core::scanner::{Token, TokenType};
 use crate::{KilnError, report_error};
 use std::borrow::Cow;
@@ -282,7 +281,33 @@ impl<'a> Parser<'a> {
             return Ok(ast.add_node(ExprKind::Unary { operator, right }));
         }
 
-        self.primary(ast)
+        self.call(ast)
+    }
+
+    fn finish_call(&mut self, ast: &mut AST<'a>, callee: ExprId) -> Result<ExprId,KilnError> {
+        let mut arguments = Vec::new();
+        if !self.check(&TokenType::RightParen) {
+            arguments.push(self.expression(ast)?);
+            while self.matches(&[TokenType::Comma]) {
+                // Design TODO: Implement argument count limit
+                arguments.push(self.expression(ast)?);
+            }
+        }
+        let paren = self.consume(TokenType::RightParen, "Expect ')' after arguments.")?;
+        Ok(ast.add_node(ExprKind::Call {callee,paren,arguments}))
+    }
+
+    fn call(&mut self, ast: &mut AST<'a>) -> Result<ExprId, KilnError> {
+        let mut expr = self.primary(ast)?;
+        loop {
+            if self.matches(&[TokenType::LeftParen]){
+                expr = self.finish_call(ast, expr)?;
+            } else {
+                break;
+            }
+        }
+
+        Ok(expr)
     }
 
     fn primary(&mut self, ast: &mut AST<'a>) -> Result<ExprId, KilnError> {

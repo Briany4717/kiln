@@ -25,6 +25,12 @@ impl<'a> ScopeStack<'a> {
         }
     }
 
+    pub fn define_global(&mut self, name: &'a str, val: LiteralValue<'a>) {
+        if let Some(current_scope) = self.scopes.first_mut() {
+            current_scope.insert(name, val);
+        }
+    }
+    
     pub fn define(&mut self, name: &'a str, val: LiteralValue<'a>) {
         if let Some(current_scope) = self.scopes.last_mut() {
             current_scope.insert(name, val);
