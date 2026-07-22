@@ -2,6 +2,7 @@ use crate::KilnError;
 use crate::core::env::ScopeStack;
 use crate::core::scanner::{Token, TokenType};
 use std::borrow::Cow;
+use crate::core::interpreter::is_truthy;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum LiteralValue<'a> {
@@ -11,36 +12,46 @@ pub enum LiteralValue<'a> {
     Nil,
 }
 
-pub type NodeId = usize;
+pub type ExprId = usize;
 pub type StmtId = usize;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ExprKind<'a> {
     Binary {
-        left: NodeId,
+        left: ExprId,
         operator: Token<'a>,
-        right: NodeId,
+        right: ExprId,
     },
     Assign {
         name: Token<'a>,
-        value: NodeId,
+        value: ExprId,
+    },
+    Logical {
+        left: ExprId,
+        operator: Token<'a>,
+        right: ExprId
     },
     Unary {
         operator: Token<'a>,
-        right: NodeId,
+        right: ExprId,
     },
-    Grouping(NodeId),
+    Grouping(ExprId),
     Literal(LiteralValue<'a>),
     Variable(Token<'a>),
 }
 
 pub enum Stmt<'a> {
-    Print(NodeId),
     Block(Vec<StmtId>),
-    Expression(NodeId),
+    Expression(ExprId),
+    If {
+        condition: ExprId,
+        then_branch: StmtId,
+        else_branch: Option<StmtId>
+    },
+    Print(ExprId),
     Var {
         name: Token<'a>,
-        initializer: Option<NodeId>,
+        initializer: Option<ExprId>,
     },
 }
 
@@ -57,7 +68,7 @@ impl<'a> AST<'a> {
         }
     }
 
-    pub fn add_node(&mut self, kind: ExprKind<'a>) -> NodeId {
+    pub fn add_node(&mut self, kind: ExprKind<'a>) -> ExprId {
         let id = self.expressions.len();
         self.expressions.push(kind);
         id
@@ -69,7 +80,7 @@ impl<'a> AST<'a> {
         id
     }
 
-    pub fn get_node(&self, id: NodeId) -> &ExprKind<'a> {
+    pub fn get_node(&self, id: ExprId) -> &ExprKind<'a> {
         &self.expressions[id]
     }
 
@@ -81,7 +92,7 @@ impl<'a> AST<'a> {
 pub(crate) fn evaluate<'a>(
     ast: &AST<'a>,
     env: &mut ScopeStack<'a>,
-    id: NodeId,
+    id: ExprId,
 ) -> Result<LiteralValue<'a>, KilnError> {
     let node = ast.get_node(id);
 
@@ -154,10 +165,23 @@ pub(crate) fn evaluate<'a>(
             let value = evaluate(ast, env, *value)?;
             env.assign(name, value)
         }
+        ExprKind::Logical {left,operator,right} => {
+            let left = evaluate(ast,env,*left)?;
+            match operator.token_type {
+                TokenType::Or => {
+                    if is_truthy(&left)? { return Ok(left) };
+                }
+                _ => {
+                    if !is_truthy(&left)? {return Ok(left)};
+                }
+            }
+            
+            Ok(evaluate(ast,env,*right)?)
+        }
     }
 }
 
-pub fn format_ast(ast: &AST, id: NodeId) -> String {
+pub fn format_ast(ast: &AST, id: ExprId) -> String {
     let node = ast.get_node(id);
     match node {
         ExprKind::Literal(lit) => match lit {
@@ -186,6 +210,7 @@ pub fn format_ast(ast: &AST, id: NodeId) -> String {
         }
         ExprKind::Variable(tk) => format!("{}", tk.lexeme),
         ExprKind::Assign { .. } => String::from(""),
+        ExprKind::Logical { .. } => todo!(),
     }
 }
 

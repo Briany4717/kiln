@@ -50,6 +50,13 @@ impl<'a> Interpreter<'a> {
                 }
                 self.env.pop_scope()
             }
+            Stmt::If {condition, then_branch, else_branch} => {
+                if is_truthy(&evaluate(ast,env,*condition)?)? {
+                    self.execute(ast, *then_branch)?;
+                } else if let Some(else_branch) = else_branch {
+                    self.execute(ast, *else_branch)?;
+                }
+            }
         }
         Ok(())
     }
@@ -60,6 +67,18 @@ impl<'a> Interpreter<'a> {
             LiteralValue::String(s) => s.to_string(),
             LiteralValue::Boolean(b) => String::from(if b { "true" } else { "false" }),
             LiteralValue::Nil => String::from("nil"),
+        }
+    }
+    
+
+}
+
+pub fn is_truthy(val: &LiteralValue) -> Result<bool,KilnError> {
+    match val {
+        LiteralValue::Boolean(b) => Ok(*b),
+        _ => {
+            let message = String::from("Expected boolean expression");
+            Err(KilnError::Runtime {message})
         }
     }
 }

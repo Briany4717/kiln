@@ -1,4 +1,4 @@
-pub(crate) use crate::core::expr::{AST, ExprKind, LiteralValue, NodeId};
+pub(crate) use crate::core::expr::{AST, ExprKind, LiteralValue, ExprId};
 use crate::core::expr::{Stmt, StmtId};
 use crate::core::scanner::{Token, TokenType};
 use crate::{KilnError, report_error};
@@ -37,7 +37,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn expression(&mut self, ast: &mut AST<'a>) -> Result<NodeId, KilnError> {
+    fn expression(&mut self, ast: &mut AST<'a>) -> Result<ExprId, KilnError> {
         self.assignment(ast)
     }
 
@@ -50,13 +50,32 @@ impl<'a> Parser<'a> {
     }
 
     fn statement(&mut self, ast: &mut AST<'a>) -> Result<Stmt<'a>, KilnError> {
-        if self.matches(&[TokenType::Print]) {
+        if self.matches(&[TokenType::If]) {
+            self.if_stmt(ast)
+        } else if self.matches(&[TokenType::Print]) {
             self.print_stmt(ast)
         } else if self.matches(&[TokenType::LeftBrace]) {
             Ok(Stmt::Block(self.block(ast)?))
         } else {
             self.expression_stmt(ast)
         }
+    }
+
+    fn if_stmt(&mut self, ast: &mut AST<'a>) -> Result<Stmt<'a>, KilnError> {
+        let condition = self.expression(ast)?;
+        let stmt = self.statement(ast)?;
+        let then_branch = ast.add_stmt(stmt);
+        let mut else_branch = None;
+        if self.matches(&[TokenType::Else]){
+            let stmt = self.statement(ast)?;
+            else_branch = Some(ast.add_stmt(stmt));
+        }
+
+        Ok(Stmt::If {
+            condition,
+            then_branch,
+            else_branch
+        })
     }
 
     fn print_stmt(&mut self, ast: &mut AST<'a>) -> Result<Stmt<'a>, KilnError> {
@@ -95,8 +114,8 @@ impl<'a> Parser<'a> {
         Ok(stmts)
     }
 
-    fn assignment(&mut self, ast: &mut AST<'a>) -> Result<NodeId, KilnError> {
-        let expr = self.equality(ast)?;
+    fn assignment(&mut self, ast: &mut AST<'a>) -> Result<ExprId, KilnError> {
+        let expr = self.or(ast)?;
         if self.matches(&[TokenType::Equal]) {
             let _equals = self.previous();
             let value = self.assignment(ast)?;
@@ -117,7 +136,39 @@ impl<'a> Parser<'a> {
         Ok(expr)
     }
 
-    fn equality(&mut self, ast: &mut AST<'a>) -> Result<NodeId, KilnError> {
+    fn or(&mut self, ast: &mut AST<'a>) -> Result<ExprId, KilnError> {
+        let mut expr = self.and(ast)?;
+
+        while self.matches(&[TokenType::Or]){
+            let operator = self.previous();
+            let right = self.and(ast)?;
+            expr = ast.add_node(ExprKind::Logical {
+                left: expr,
+                operator,
+                right
+            })
+        }
+
+       Ok(expr)
+    }
+
+    fn and(&mut self, ast: &mut AST<'a>) -> Result<ExprId, KilnError> {
+        let mut expr = self.equality(ast)?;
+
+        while self.matches(&[TokenType::And]){
+            let operator = self.previous();
+            let right = self.equality(ast)?;
+            expr = ast.add_node(ExprKind::Logical {
+                left: expr,
+                operator,
+                right
+            })
+        }
+
+        Ok(expr)
+    }
+
+    fn equality(&mut self, ast: &mut AST<'a>) -> Result<ExprId, KilnError> {
         let mut expr = self.comparison(ast)?;
         while self.matches(&[TokenType::BangEqual, TokenType::EqualEqual]) {
             let operator = self.previous();
@@ -131,7 +182,7 @@ impl<'a> Parser<'a> {
         Ok(expr)
     }
 
-    fn comparison(&mut self, ast: &mut AST<'a>) -> Result<NodeId, KilnError> {
+    fn comparison(&mut self, ast: &mut AST<'a>) -> Result<ExprId, KilnError> {
         let mut expr = self.term(ast)?;
 
         while self.matches(&[
@@ -152,7 +203,7 @@ impl<'a> Parser<'a> {
         Ok(expr)
     }
 
-    fn term(&mut self, ast: &mut AST<'a>) -> Result<NodeId, KilnError> {
+    fn term(&mut self, ast: &mut AST<'a>) -> Result<ExprId, KilnError> {
         let mut expr = self.factor(ast)?;
 
         while self.matches(&[TokenType::Minus, TokenType::Plus]) {
@@ -168,7 +219,7 @@ impl<'a> Parser<'a> {
         Ok(expr)
     }
 
-    fn factor(&mut self, ast: &mut AST<'a>) -> Result<NodeId, KilnError> {
+    fn factor(&mut self, ast: &mut AST<'a>) -> Result<ExprId, KilnError> {
         let mut expr = self.unary(ast)?;
 
         while self.matches(&[TokenType::Slash, TokenType::Star]) {
@@ -184,7 +235,7 @@ impl<'a> Parser<'a> {
         Ok(expr)
     }
 
-    fn unary(&mut self, ast: &mut AST<'a>) -> Result<NodeId, KilnError> {
+    fn unary(&mut self, ast: &mut AST<'a>) -> Result<ExprId, KilnError> {
         if self.matches(&[TokenType::Bang, TokenType::Minus]) {
             let operator = self.previous();
             let right = self.unary(ast)?;
@@ -194,7 +245,7 @@ impl<'a> Parser<'a> {
         self.primary(ast)
     }
 
-    fn primary(&mut self, ast: &mut AST<'a>) -> Result<NodeId, KilnError> {
+    fn primary(&mut self, ast: &mut AST<'a>) -> Result<ExprId, KilnError> {
         if self.is_at_end() {
             return Err(KilnError::Runtime {
                 message: "Invalid token".to_string(),
