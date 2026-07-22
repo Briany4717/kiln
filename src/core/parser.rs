@@ -41,11 +41,14 @@ impl<'a> Parser<'a> {
     }
 
     fn declaration(&mut self, ast: &mut AST<'a>) -> Result<Stmt<'a>, KilnError> {
-        if self.matches(&[TokenType::Let]) {
+        if self.matches(&[TokenType::Fn]){
+            self.function(ast,"function")
+        } else if self.matches(&[TokenType::Let]) {
             self.var_declaration(ast)
         } else {
             self.statement(ast)
         }
+
     }
 
     fn statement(&mut self, ast: &mut AST<'a>) -> Result<Stmt<'a>, KilnError> {
@@ -126,6 +129,23 @@ impl<'a> Parser<'a> {
         let val = self.expression(ast)?;
         self.consume(TokenType::Semicolon, "Expect ';' after expression.")?;
         Ok(Stmt::Expression(val))
+    }
+
+    fn function(&mut self, ast: &mut AST<'a>, kind: &'a str) -> Result<Stmt<'a>, KilnError> {
+        let name = self.consume_identifier(&format!("Expect {} name.",kind))?;
+        self.consume(TokenType::LeftParen, &format!("Expect '(' after {} name.",kind))?;
+        let mut params = Vec::new();
+        if !self.check(&TokenType::RightParen) {
+            params.push(self.consume_identifier("Expect parameter name.")?);
+            while self.matches(&[TokenType::Comma]) {
+                params.push(self.consume_identifier("Expect parameter name.")?);
+            }
+        }
+        self.consume(TokenType::RightParen, "Expect ')' after parameters.")?;
+        self.consume(TokenType::LeftBrace, &format!("Expect '{{' before {} body.",kind))?;
+        let body_stmts = self.block(ast)?;
+        let body = ast.add_stmt(Stmt::Block(body_stmts));
+        Ok(Stmt::Function {name, params,body})
     }
 
     fn block(&mut self, ast: &mut AST<'a>) -> Result<Vec<StmtId>, KilnError> {

@@ -4,7 +4,7 @@ use crate::core::env::ScopeStack;
 use crate::core::expr::{LiteralValue, Stmt, StmtId, evaluate, AST};
 use crate::core::kiln_callable::KilnCallable;
 pub struct Interpreter<'a> {
-    env: ScopeStack<'a>,
+    pub env: ScopeStack<'a>,
 }
 
 impl<'a> Interpreter<'a> {
@@ -33,19 +33,19 @@ impl<'a> Interpreter<'a> {
         Ok(())
     }
 
-    fn execute(&mut self, ast: &AST<'a>, stmt_id: StmtId) -> Result<(), KilnError> {
+    pub fn execute(&mut self, ast: &AST<'a>, stmt_id: StmtId) -> Result<(), KilnError> {
         let env = &mut self.env;
         match ast.get_stmt(stmt_id) {
             Stmt::Print(id) => {
-                let val = evaluate(ast, env, *id)?;
+                let val = evaluate(ast,self, *id)?;
                 println!("{}", self.stringify(val))
             }
             Stmt::Expression(id) => {
-                evaluate(ast, env, *id)?;
+                evaluate(ast, self, *id)?;
             }
             Stmt::Var { name, initializer } => {
                 if let Some(id) = initializer {
-                    let val = evaluate(ast, env, *id)?;
+                    let val = evaluate(ast, self, *id)?;
                     self.env.define(name.lexeme, val)
                 } else {
                     self.env.define(name.lexeme, LiteralValue::Nil)
@@ -63,14 +63,14 @@ impl<'a> Interpreter<'a> {
                 then_branch,
                 else_branch,
             } => {
-                if is_truthy(&evaluate(ast, env, *condition)?)? {
+                if is_truthy(&evaluate(ast, self, *condition)?)? {
                     self.execute(ast, *then_branch)?;
                 } else if let Some(else_branch) = else_branch {
                     self.execute(ast, *else_branch)?;
                 }
             }
             Stmt::While { condition, body } => {
-                while is_truthy(&evaluate(ast, &mut self.env, *condition)?)? {
+                while is_truthy(&evaluate(ast, self, *condition)?)? {
                     self.execute(ast, *body)?;
                 }
             }
@@ -79,7 +79,7 @@ impl<'a> Interpreter<'a> {
                 iterable,
                 body,
             } => {
-                let iterator = evaluate(ast, env, *iterable)?;
+                let iterator = evaluate(ast, self, *iterable)?;
                 match iterator {
                     LiteralValue::Range {
                         start,
@@ -108,6 +108,13 @@ impl<'a> Interpreter<'a> {
                         });
                     }
                 }
+            }
+            Stmt::Function {name,params,body} => {
+                env.define(name.lexeme,LiteralValue::Callable(KilnCallable::UserDefined {
+                    name: (*name).clone(),
+                    params: (*params).clone(),
+                    body: *body
+                }))
             }
         }
         Ok(())

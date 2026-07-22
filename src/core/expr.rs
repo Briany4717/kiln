@@ -1,6 +1,6 @@
 use crate::{report_error, KilnError};
 use crate::core::env::ScopeStack;
-use crate::core::interpreter::is_truthy;
+use crate::core::interpreter::{is_truthy, Interpreter};
 use crate::core::parser::ensure_int;
 use crate::core::scanner::{Token, TokenType};
 use std::borrow::Cow;
@@ -62,6 +62,11 @@ pub enum ExprKind<'a> {
 pub enum Stmt<'a> {
     Block(Vec<StmtId>),
     Expression(ExprId),
+    Function {
+        name: Token<'a>,
+        params: Vec<Token<'a>>,
+        body: StmtId
+    },
     If {
         condition: ExprId,
         then_branch: StmtId,
@@ -119,16 +124,16 @@ impl<'a> AST<'a> {
 
 pub(crate) fn evaluate<'a>(
     ast: &AST<'a>,
-    env: &mut ScopeStack<'a>,
+    interpreter: &mut Interpreter<'a>,
     id: ExprId,
 ) -> Result<LiteralValue<'a>, KilnError> {
     let node = ast.get_node(id);
 
     match node {
         ExprKind::Literal(val) => Ok(val.clone()),
-        ExprKind::Grouping(child_id) => evaluate(ast, env, *child_id),
+        ExprKind::Grouping(child_id) => evaluate(ast, interpreter, *child_id),
         ExprKind::Unary { operator, right } => {
-            let right_val = evaluate(ast, env, *right)?;
+            let right_val = evaluate(ast, interpreter, *right)?;
             match &operator.token_type {
                 TokenType::Minus => match right_val {
                     LiteralValue::Number(n) => Ok(LiteralValue::Number(-n)),
@@ -150,8 +155,8 @@ pub(crate) fn evaluate<'a>(
             operator,
             right,
         } => {
-            let left_val = evaluate(ast, env, *left)?;
-            let right_val = evaluate(ast, env, *right)?;
+            let left_val = evaluate(ast, interpreter, *left)?;
+            let right_val = evaluate(ast, interpreter, *right)?;
             let operation = &operator.token_type;
             match (left_val, right_val) {
                 (LiteralValue::Number(n), LiteralValue::Number(m)) => match operation {
@@ -188,17 +193,17 @@ pub(crate) fn evaluate<'a>(
                 }
             }
         }
-        ExprKind::Variable(tk) => env.get(tk),
+        ExprKind::Variable(tk) => interpreter.env.get(tk),
         ExprKind::Assign { name, value } => {
-            let value = evaluate(ast, env, *value)?;
-            env.assign(name, value)
+            let value = evaluate(ast, interpreter, *value)?;
+            interpreter.env.assign(name, value)
         }
         ExprKind::Logical {
             left,
             operator,
             right,
         } => {
-            let left = evaluate(ast, env, *left)?;
+            let left = evaluate(ast, interpreter, *left)?;
             match operator.token_type {
                 TokenType::Or => {
                     if is_truthy(&left)? {
@@ -212,15 +217,15 @@ pub(crate) fn evaluate<'a>(
                 }
             }
 
-            Ok(evaluate(ast, env, *right)?)
+            Ok(evaluate(ast, interpreter, *right)?)
         }
         ExprKind::Range {
             start,
             end,
             inclusive,
         } => {
-            let start_val = evaluate(ast, env, *start)?;
-            let end_val = evaluate(ast, env, *end)?;
+            let start_val = evaluate(ast, interpreter, *start)?;
+            let end_val = evaluate(ast, interpreter, *end)?;
 
             match (start_val, end_val) {
                 (LiteralValue::Number(s), LiteralValue::Number(e)) => {
@@ -238,10 +243,10 @@ pub(crate) fn evaluate<'a>(
             }
         }
         ExprKind::Call {callee,paren,arguments: expr_args} => {
-            let callee_val = evaluate(ast,env,*callee)?;
+            let callee_val = evaluate(ast, interpreter,*callee)?;
             let mut arguments = Vec::new();
             for arg in expr_args {
-                arguments.push(evaluate(ast,env,*arg)?);
+                arguments.push(evaluate(ast, interpreter,*arg)?);
             }
 
             let function = match callee_val {
@@ -267,7 +272,7 @@ pub(crate) fn evaluate<'a>(
                 });
             }
 
-            function.call(&arguments)
+            function.call(&arguments, interpreter,ast)
 
         }
     }
@@ -337,13 +342,14 @@ mod test {
     use crate::core::expr::{AST, ExprKind, LiteralValue, evaluate};
     use crate::core::scanner::{Token, TokenType};
     use std::borrow::Cow;
+    use crate::core::interpreter::Interpreter;
 
     #[test]
     fn literal_value_expression_has_expected_result() -> Result<(), KilnError> {
         let mut ast = AST::new();
         let id = ast.add_node(ExprKind::Literal(LiteralValue::Number(32.0)));
         let id_ev = ast.add_node(ExprKind::Grouping(id));
-        let mut env = ScopeStack::new();
+        let mut env = Interpreter::new();
         assert_eq!(evaluate(&ast, &mut env, id_ev)?, LiteralValue::Number(32.0));
         Ok(())
     }
@@ -360,7 +366,7 @@ mod test {
             },
             right,
         });
-        let mut env = ScopeStack::new();
+        let mut env = Interpreter::new();
         assert_eq!(evaluate(&ast, &mut env, id)?, LiteralValue::Number(-32.0));
         let right = ast.add_node(ExprKind::Literal(LiteralValue::Boolean(false)));
         let id = ast.add_node(ExprKind::Unary {
@@ -378,7 +384,7 @@ mod test {
     #[test]
     fn unitary_evaluation_errors_are_displayed() -> Result<(), KilnError> {
         let mut ast = AST::new();
-        let mut env = ScopeStack::new();
+        let mut env = Interpreter::new();
         let right = ast.add_node(ExprKind::Literal(LiteralValue::Number(32.0)));
         let id = ast.add_node(ExprKind::Unary {
             operator: Token {
@@ -421,7 +427,7 @@ mod test {
     #[test]
     fn binary_expression_evaluation_has_expected_result() -> Result<(), KilnError> {
         let mut ast = AST::new();
-        let mut env = ScopeStack::new();
+        let mut env = Interpreter::new();
         let operations = vec![
             TokenType::Plus,
             TokenType::Minus,

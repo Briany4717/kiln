@@ -1,4 +1,6 @@
-use crate::core::expr::{LiteralValue, StmtId};
+use crate::core::env::ScopeStack;
+use crate::core::expr::{LiteralValue, StmtId, AST};
+use crate::core::interpreter::Interpreter;
 use crate::core::scanner::Token;
 use crate::KilnError;
 
@@ -17,13 +19,18 @@ pub(crate) enum KilnCallable<'a> {
 }
 
 impl<'a> KilnCallable<'a> {
-    pub(crate) fn call(&self, args: &[LiteralValue<'a>]) -> Result<LiteralValue<'a>, KilnError>{
+    pub(crate) fn call(&self, args: &[LiteralValue<'a>], interpreter: &mut Interpreter<'a>, ast: &AST<'a>) -> Result<LiteralValue<'a>, KilnError>{
         match self {
             KilnCallable::Native {func, ..} => {
                 func(args)
             }
-            KilnCallable::UserDefined {..} => {
-                todo!()
+            KilnCallable::UserDefined { params, body, ..} => {
+                interpreter.env.push_scope();
+                for i in 0..params.len() {
+                    interpreter.env.define(params[i].lexeme,args[i].clone())
+                }
+                interpreter.execute(ast, *body)?;
+                Ok(LiteralValue::Nil)
             }
         }
     }
