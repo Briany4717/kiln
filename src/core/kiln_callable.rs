@@ -29,7 +29,9 @@ impl<'a> KilnCallable<'a> {
                 for i in 0..params.len() {
                     interpreter.env.define(params[i].lexeme,args[i].clone())
                 }
-                interpreter.execute(ast, *body)?;
+                let res =interpreter.execute(ast, *body);
+                interpreter.env.pop_scope();
+                res?;
                 Ok(LiteralValue::Nil)
             }
         }

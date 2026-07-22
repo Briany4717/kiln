@@ -33,7 +33,7 @@ impl<'a> Interpreter<'a> {
         Ok(())
     }
 
-    pub fn execute(&mut self, ast: &AST<'a>, stmt_id: StmtId) -> Result<(), KilnError> {
+    pub(crate) fn execute(&mut self, ast: &AST<'a>, stmt_id: StmtId) -> Result<(), KilnError> {
         let env = &mut self.env;
         match ast.get_stmt(stmt_id) {
             Stmt::Print(id) => {
@@ -137,7 +137,10 @@ impl<'a> Interpreter<'a> {
                 }
             }
             LiteralValue::Nil => String::from("nil"),
-            _ => {todo!()}
+            LiteralValue::Callable(func) => match func {
+                KilnCallable::Native { name, .. } => format!("<native fn {name}>"),
+                KilnCallable::UserDefined { name, .. } => format!("<fn {}>", name.lexeme),
+            },
         }
     }
 }
