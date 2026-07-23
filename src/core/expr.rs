@@ -4,7 +4,7 @@ use crate::core::interpreter::{is_truthy, Interpreter};
 use crate::core::parser::ensure_int;
 use crate::core::scanner::{Token, TokenType};
 use std::borrow::Cow;
-use crate::core::callable::AmystCallable;
+use crate::core::callable::{AmystCallable, AmystType, Param};
 
 
 #[derive(Debug, Clone, PartialEq)]
@@ -64,8 +64,9 @@ pub enum Stmt<'a> {
     Expression(ExprId),
     Function {
         name: Token<'a>,
-        params: Vec<Token<'a>>,
-        body: StmtId
+        params: Vec<Param<'a>>,
+        body: StmtId,
+        return_type: Option<AmystType>
     },
     If {
         condition: ExprId,

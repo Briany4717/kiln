@@ -16,12 +16,14 @@ pub enum TokenType<'a> {
     LeftBrace,
     RightBrace,
     Comma,
+    Arrow,
     Dot,
     DotDot,
     DotDotEqual,
     Minus,
     Plus,
     Semicolon,
+    Colon,
     Slash,
     Star,
     Bang,
@@ -42,6 +44,7 @@ pub enum TokenType<'a> {
     Else,
     False,
     Fn,
+    Mut,
     For,
     If,
     Nil,
@@ -100,24 +103,21 @@ impl<'a> Scanner<'a> {
     fn scan_token(&mut self) -> Result<(), AmystError> {
         let c = self.advance();
         match c {
+            ':' => Ok(self.add_token(TokenType::Colon)),
             '(' => Ok(self.add_token(TokenType::LeftParen)),
             ')' => Ok(self.add_token(TokenType::RightParen)),
             '{' => Ok(self.add_token(TokenType::LeftBrace)),
             '}' => Ok(self.add_token(TokenType::RightBrace)),
             ',' => Ok(self.add_token(TokenType::Comma)),
-            '-' => Ok(self.add_token(TokenType::Minus)),
             '+' => Ok(self.add_token(TokenType::Plus)),
             ';' => Ok(self.add_token(TokenType::Semicolon)),
             '*' => Ok(self.add_token(TokenType::Star)),
-            '.' => {
-                let t = if self.matches('.') {
-                    if self.matches('=') {
-                        TokenType::DotDotEqual
-                    } else {
-                        TokenType::DotDot
-                    }
+            '"' => self.add_string_token(),
+            '-' => {
+                let t = if self.matches('>') {
+                    TokenType::Arrow
                 } else {
-                    TokenType::Dot
+                    TokenType::Minus
                 };
                 Ok(self.add_token(t))
             }
@@ -163,7 +163,18 @@ impl<'a> Scanner<'a> {
                     Ok(self.add_token(TokenType::Slash))
                 }
             }
-            '"' => self.add_string_token(),
+            '.' => {
+                let t = if self.matches('.') {
+                    if self.matches('=') {
+                        TokenType::DotDotEqual
+                    } else {
+                        TokenType::DotDot
+                    }
+                } else {
+                    TokenType::Dot
+                };
+                Ok(self.add_token(t))
+            }
             ' ' | '\r' | '\t' => Ok(()),
             '\n' => {
                 self.line += 1;
@@ -199,6 +210,7 @@ impl<'a> Scanner<'a> {
             "false" => TokenType::False,
             "for" => TokenType::For,
             "fn" => TokenType::Fn,
+            "mut" => TokenType::Mut,
             "if" => TokenType::If,
             "nil" => TokenType::Nil,
             "in" => TokenType::In,

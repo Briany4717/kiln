@@ -2,6 +2,7 @@ use crate::core::expr::{Stmt, StmtId, AST, LiteralValue, ExprId, ExprKind};
 use crate::core::scanner::{Token, TokenType};
 use crate::{AmystError, report_error};
 use std::borrow::Cow;
+use crate::core::callable::{AmystType, Param};
 
 pub struct Parser<'a> {
     tokens: &'a [Token<'a>],
@@ -136,16 +137,54 @@ impl<'a> Parser<'a> {
         self.consume(TokenType::LeftParen, &format!("Expect '(' after {} name.",kind))?;
         let mut params = Vec::new();
         if !self.check(&TokenType::RightParen) {
-            params.push(self.consume_identifier("Expect parameter name.")?);
+            let is_mut = if self.matches(&[TokenType::Mut]){ true } else { false };
+
+            let name = self.consume_identifier("Expect parameter name.")?;
+
+            let type_annotation= if self.matches(&[TokenType::Colon]){
+                Some(self.parse_type("Expected parameter type identifier.")?)
+            } else { None };
+
+            params.push(Param { name , is_mut, type_annotation});
             while self.matches(&[TokenType::Comma]) {
-                params.push(self.consume_identifier("Expect parameter name.")?);
+                let is_mut = if self.matches(&[TokenType::Mut]){ true } else { false };
+
+                let name = self.consume_identifier("Expect parameter name.")?;
+
+                let type_annotation= if self.matches(&[TokenType::Colon]){
+                    Some(self.parse_type("Expected parameter type identifier.")?)
+                } else { None };
+                params.push(Param { name , is_mut, type_annotation});
             }
         }
         self.consume(TokenType::RightParen, "Expect ')' after parameters.")?;
+        let return_type = if self.check(&TokenType::Arrow) {
+            self.advance();
+            Some(self.parse_type("Expected return type.")?)
+        } else { None };
+
         self.consume(TokenType::LeftBrace, &format!("Expect '{{' before {} body.",kind))?;
         let body_stmts = self.block(ast)?;
         let body = ast.add_stmt(Stmt::Block(body_stmts));
-        Ok(Stmt::Function {name, params,body})
+        Ok(Stmt::Function {name, params,body,return_type})
+    }
+
+    fn parse_type(&mut self, message: &str) -> Result<AmystType, AmystError> {
+        if self.matches(&[TokenType::LeftParen]) {
+            self.consume(TokenType::RightParen, "Expected ')' to close unit type.")?;
+            return Ok(AmystType::Unit);
+        }
+
+        let tok = self.consume_identifier(message)?;
+        let ty = match tok.lexeme {
+            "int" => AmystType::Int,
+            "float" => AmystType::Float,
+            "string" => AmystType::String,
+            "bool" => AmystType::Bool,
+            "unit" => AmystType::Unit,
+            name => AmystType::Named(name.to_string()),
+        };
+        Ok(ty)
     }
 
     fn block(&mut self, ast: &mut AST<'a>) -> Result<Vec<StmtId>, AmystError> {

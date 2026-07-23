@@ -109,11 +109,12 @@ impl<'a> Interpreter<'a> {
                     }
                 }
             }
-            Stmt::Function {name,params,body} => {
+            Stmt::Function {name,params,body, return_type} => {
                 env.define(name.lexeme,LiteralValue::Callable(AmystCallable::UserDefined {
                     name: (*name).clone(),
                     params: (*params).clone(),
-                    body: *body
+                    body: *body,
+                    return_type: (*return_type).clone()
                 }))
             }
         }

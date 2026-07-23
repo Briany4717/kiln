@@ -5,6 +5,24 @@ use crate::core::scanner::Token;
 use crate::AmystError;
 
 #[derive(Clone, PartialEq, Debug)]
+pub enum AmystType {
+    Int,
+    Float,
+    String,
+    Bool,
+    Unit,
+    Named(String),
+    Option(Box<AmystType>),
+}
+
+#[derive(Clone, PartialEq, Debug)]
+pub struct Param<'a> {
+    pub name: Token<'a>,
+    pub is_mut: bool,
+    pub type_annotation: Option<AmystType>,
+}
+
+#[derive(Clone, PartialEq, Debug)]
 pub(crate) enum AmystCallable<'a> {
     Native {
         arity: usize,
@@ -13,8 +31,9 @@ pub(crate) enum AmystCallable<'a> {
     },
     UserDefined {
         name: Token<'a>,
-        params: Vec<Token<'a>>,
+        params: Vec<Param<'a>>,
         body: StmtId,
+        return_type: Option<AmystType>
     },
 }
 
@@ -27,7 +46,7 @@ impl<'a> AmystCallable<'a> {
             AmystCallable::UserDefined { params, body, ..} => {
                 interpreter.env.push_scope();
                 for i in 0..params.len() {
-                    interpreter.env.define(params[i].lexeme,args[i].clone())
+                    interpreter.env.define(params[i].name.lexeme,args[i].clone())
                 }
                 let res =interpreter.execute(ast, *body);
                 interpreter.env.pop_scope();
