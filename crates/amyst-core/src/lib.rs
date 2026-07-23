@@ -4,12 +4,12 @@
 //! con la CLI. Es lo que consumen `amyst-cli`, y en el futuro `amyst-lsp` y
 //! `amyst-embed`.
 
-mod diagnostics;
-pub mod lexer;
 pub mod ast;
-pub mod parser;
-pub mod interpreter;
+mod diagnostics;
 mod engine;
+pub mod interpreter;
+pub mod lexer;
+pub mod parser;
 pub mod prelude;
 
 pub use diagnostics::{AmystError, report_error};

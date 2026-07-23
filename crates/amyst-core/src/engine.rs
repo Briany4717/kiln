@@ -1,8 +1,8 @@
+use crate::AmystError;
 use crate::ast::AST;
 use crate::interpreter::{Interpreter, Value};
 use crate::lexer::Scanner;
 use crate::parser::Parser;
-use crate::AmystError;
 
 pub struct Engine<'a> {
     interpreter: Interpreter<'a>,
@@ -33,7 +33,10 @@ impl<'a> Engine<'a> {
     }
 
     /// Solo scanea + parsea, sin ejecutar.
-    pub fn compile(&self, source: &'a str) -> Result<(AST<'a>, Vec<crate::ast::StmtId>), AmystError<'a>> {
+    pub fn compile(
+        &self,
+        source: &'a str,
+    ) -> Result<(AST<'a>, Vec<crate::ast::StmtId>), AmystError<'a>> {
         let scanner = Scanner::new(source);
         let tokens = scanner.scan_tokens()?;
         let mut parser = Parser::new(tokens);
