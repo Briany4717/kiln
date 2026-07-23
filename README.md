@@ -10,7 +10,9 @@ como la base de un lenguaje que busca ser rápido, tan simple como el usuario de
 
 ## Estado del proyecto
 
-**En desarrollo activo.** Amyst todavía está tomando forma — la sintaxis y las funcionalidades pueden cambiar sin previo aviso.
+**En desarrollo activo.** Amyst todavía está tomando forma.
+
+*La sintaxis y las funcionalidades pueden cambiar sin previo aviso*.
 
 - [x] Lexer / Scanner
 - [x] Parser (AST)
