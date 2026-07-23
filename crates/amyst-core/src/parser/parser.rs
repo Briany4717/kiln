@@ -37,7 +37,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn expression(&mut self, ast: &mut AST<'a>) -> Result<ExprId, AmystError<'a>> {
+    pub(crate) fn expression(&mut self, ast: &mut AST<'a>) -> Result<ExprId, AmystError<'a>> {
         self.assignment(ast)
     }
 
