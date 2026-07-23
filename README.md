@@ -29,7 +29,7 @@ Mi abuela me regaló alguna vez un anillo de amatista y mientras buscaba un buen
 
 La amatista es un cuarzo violeta cuyo nombre viene del griego *amethystos*, que significa literalmente
 **"no ebrio"**: los antiguos griegos creían que la piedra protegía contra la embriaguez y traía claridad mental.
-Es una buena metáfora para un lenguaje que aspira a ser claro, directo y sin ruido innecesario —
+Es una buena metáfora para un lenguaje que aspira a ser claro, directo y sin ruido innecesario, 
 tanto en su sintaxis como en cómo se siente escribir en él.
 
 ## Instalación

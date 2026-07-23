@@ -5,7 +5,7 @@ use crate::core::scanner::Token;
 use crate::AmystError;
 
 #[derive(Clone, PartialEq, Debug)]
-pub(crate) enum KilnCallable<'a> {
+pub(crate) enum AmystCallable<'a> {
     Native {
         arity: usize,
         name: &'a str,
@@ -18,13 +18,13 @@ pub(crate) enum KilnCallable<'a> {
     },
 }
 
-impl<'a> KilnCallable<'a> {
+impl<'a> AmystCallable<'a> {
     pub(crate) fn call(&self, args: &[LiteralValue<'a>], interpreter: &mut Interpreter<'a>, ast: &AST<'a>) -> Result<LiteralValue<'a>, AmystError>{
         match self {
-            KilnCallable::Native {func, ..} => {
+            AmystCallable::Native {func, ..} => {
                 func(args)
             }
-            KilnCallable::UserDefined { params, body, ..} => {
+            AmystCallable::UserDefined { params, body, ..} => {
                 interpreter.env.push_scope();
                 for i in 0..params.len() {
                     interpreter.env.define(params[i].lexeme,args[i].clone())
@@ -38,8 +38,8 @@ impl<'a> KilnCallable<'a> {
     }
     pub fn arity(&self) -> usize {
         match self {
-            KilnCallable::Native { arity, .. } => *arity,
-            KilnCallable::UserDefined { params, .. } => params.len(),
+            AmystCallable::Native { arity, .. } => *arity,
+            AmystCallable::UserDefined { params, .. } => params.len(),
         }
     }
 }

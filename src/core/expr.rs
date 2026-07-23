@@ -4,7 +4,7 @@ use crate::core::interpreter::{is_truthy, Interpreter};
 use crate::core::parser::ensure_int;
 use crate::core::scanner::{Token, TokenType};
 use std::borrow::Cow;
-use crate::core::kiln_callable::KilnCallable;
+use crate::core::callable::AmystCallable;
 
 
 #[derive(Debug, Clone, PartialEq)]
@@ -17,7 +17,7 @@ pub enum LiteralValue<'a> {
         end: i32,
         inclusive: bool,
     },
-    Callable(KilnCallable<'a>),
+    Callable(AmystCallable<'a>),
     Nil,
 }
 

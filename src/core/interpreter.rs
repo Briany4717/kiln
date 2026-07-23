@@ -2,7 +2,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use crate::AmystError;
 use crate::core::env::ScopeStack;
 use crate::core::expr::{LiteralValue, Stmt, StmtId, evaluate, AST};
-use crate::core::kiln_callable::KilnCallable;
+use crate::core::callable::AmystCallable;
 pub struct Interpreter<'a> {
     pub env: ScopeStack<'a>,
 }
@@ -11,7 +11,7 @@ impl<'a> Interpreter<'a> {
     pub fn new() -> Self {
         let mut env = ScopeStack::new();
 
-        env.define_global("clock", LiteralValue::Callable(KilnCallable::Native {
+        env.define_global("clock", LiteralValue::Callable(AmystCallable::Native {
             arity: 0,
             name: "clock",
             func: |_args|{Ok(LiteralValue::Number(SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis() as f64))},
@@ -110,7 +110,7 @@ impl<'a> Interpreter<'a> {
                 }
             }
             Stmt::Function {name,params,body} => {
-                env.define(name.lexeme,LiteralValue::Callable(KilnCallable::UserDefined {
+                env.define(name.lexeme,LiteralValue::Callable(AmystCallable::UserDefined {
                     name: (*name).clone(),
                     params: (*params).clone(),
                     body: *body
@@ -138,8 +138,8 @@ impl<'a> Interpreter<'a> {
             }
             LiteralValue::Nil => String::from("nil"),
             LiteralValue::Callable(func) => match func {
-                KilnCallable::Native { name, .. } => format!("<native fn {name}>"),
-                KilnCallable::UserDefined { name, .. } => format!("<fn {}>", name.lexeme),
+                AmystCallable::Native { name, .. } => format!("<native fn {name}>"),
+                AmystCallable::UserDefined { name, .. } => format!("<fn {}>", name.lexeme),
             },
         }
     }
