@@ -1,11 +1,11 @@
-use crate::core::expr::LiteralValue;
-use crate::core::scanner::Token;
 use crate::{AmystError, report_error};
 use std::collections::HashMap;
+use crate::interpreter::Value;
+use crate::lexer::Token;
 
 #[derive(Debug, Clone)]
 pub struct ScopeStack<'a> {
-    scopes: Vec<HashMap<&'a str, LiteralValue<'a>>>,
+    scopes: Vec<HashMap<&'a str, Value<'a>>>,
 }
 
 impl<'a> ScopeStack<'a> {
@@ -25,19 +25,19 @@ impl<'a> ScopeStack<'a> {
         }
     }
 
-    pub fn define_global(&mut self, name: &'a str, val: LiteralValue<'a>) {
+    pub fn define_global(&mut self, name: &'a str, val: Value<'a>) {
         if let Some(current_scope) = self.scopes.first_mut() {
             current_scope.insert(name, val);
         }
     }
 
-    pub fn define(&mut self, name: &'a str, val: LiteralValue<'a>) {
+    pub fn define(&mut self, name: &'a str, val: Value<'a>) {
         if let Some(current_scope) = self.scopes.last_mut() {
             current_scope.insert(name, val);
         }
     }
 
-    pub(crate) fn get(&self, name: &Token<'a>) -> Result<LiteralValue<'a>, AmystError<'a>> {
+    pub(crate) fn get(&self, name: &Token<'a>) -> Result<Value<'a>, AmystError<'a>> {
         for scope in self.scopes.iter().rev() {
             if let Some(val) = scope.get(name.lexeme) {
                 return Ok(val.clone());
@@ -56,8 +56,8 @@ impl<'a> ScopeStack<'a> {
     pub(crate) fn assign(
         &mut self,
         tk: &Token<'a>,
-        val: LiteralValue<'a>,
-    ) -> Result<LiteralValue<'a>, AmystError<'a>> {
+        val: Value<'a>,
+    ) -> Result<Value<'a>, AmystError<'a>> {
         let name = tk.lexeme;
 
         for scope in self.scopes.iter_mut().rev() {

@@ -1,4 +1,4 @@
-use crate::core::expr::LiteralValue;
+use crate::interpreter::Value;
 use std::fmt::Display;
 
 #[derive(Debug, PartialEq)]
@@ -9,7 +9,7 @@ pub enum AmystError<'a> {
     UnterminatedString,
     InvalidNumberFormat,
     Runtime { message: String },
-    Return(LiteralValue<'a>),
+    Return(Value<'a>),
     Multiple(Vec<AmystError<'a>>),
 }
 

@@ -1,8 +1,9 @@
-use crate::core::callable::{AmystType, Param};
-use crate::core::expr::{AST, ExprId, ExprKind, LiteralValue, Stmt, StmtId};
-use crate::core::scanner::{Token, TokenType};
+
+use crate::ast::{AST, ExprId, ExprKind, Stmt, StmtId, AmystType, Param};
 use crate::{AmystError, report_error};
 use std::borrow::Cow;
+use crate::interpreter::Value;
+use crate::lexer::{Token, TokenType};
 
 pub struct Parser<'a> {
     tokens: Vec<Token<'a>>,
@@ -105,7 +106,7 @@ impl<'a> Parser<'a> {
         let value = if !self.check(&TokenType::Semicolon) {
             self.expression(ast)?
         } else {
-            ast.add_node(ExprKind::Literal(LiteralValue::Unit))
+            ast.add_node(ExprKind::Literal(Value::Unit))
         };
         self.consume(TokenType::Semicolon, "Expect ';' after return value")?;
         Ok(Stmt::Return { keyword, value })
@@ -445,11 +446,11 @@ impl<'a> Parser<'a> {
 
         let tok = self.advance();
         let expr = match tok.token_type {
-            TokenType::False => ExprKind::Literal(LiteralValue::Boolean(false)),
-            TokenType::True => ExprKind::Literal(LiteralValue::Boolean(true)),
-            TokenType::Unit => ExprKind::Literal(LiteralValue::Unit),
-            TokenType::Number(n) => ExprKind::Literal(LiteralValue::Number(n)),
-            TokenType::String(s) => ExprKind::Literal(LiteralValue::String(Cow::from(s))),
+            TokenType::False => ExprKind::Literal(Value::Boolean(false)),
+            TokenType::True => ExprKind::Literal(Value::Boolean(true)),
+            TokenType::Unit => ExprKind::Literal(Value::Unit),
+            TokenType::Number(n) => ExprKind::Literal(Value::Number(n)),
+            TokenType::String(s) => ExprKind::Literal(Value::String(Cow::from(s))),
             TokenType::LeftParen => {
                 let exp = self.expression(ast)?;
                 self.consume(TokenType::RightParen, "Expected ')' after expression.")?;
@@ -605,7 +606,7 @@ impl<'a> Parser<'a> {
     }
 }
 
-pub(crate) fn ensure_int<'a>(val: f64) -> Result<i32, AmystError<'a>> {
+pub fn ensure_int<'a>(val: f64) -> Result<i32, AmystError<'a>> {
     if val.fract() != 0.0 {
         let message = String::from("Float has a fractional component and is not a whole integer");
         return Err(AmystError::Runtime { message });
@@ -622,9 +623,9 @@ pub(crate) fn ensure_int<'a>(val: f64) -> Result<i32, AmystError<'a>> {
 #[cfg(test)]
 mod test {
     use crate::AmystError;
-    use crate::core::Scanner;
-    use crate::core::expr::{AST, format_ast};
-    use crate::core::parser::Parser;
+    use crate::ast::{AST, format_ast};
+    use crate::parser::parser::Parser;
+    use crate::lexer::Scanner;
 
     #[test]
     fn parsing_test<'a>() -> Result<(), AmystError<'a>> {

@@ -1,7 +1,7 @@
 use std::path::PathBuf;
-use amyst_core::core::Scanner;
-use amyst_core::core::expr::AST;
-use amyst_core::core::interpreter::Interpreter;
+use amyst_core::lexer::Scanner;
+use amyst_core::ast::AST;
+use amyst_core::interpreter::Interpreter;
 use amyst_core::AmystError;
 use clap::{Parser, Subcommand};
 
@@ -45,10 +45,10 @@ fn run_file(file: &str) -> Result<(), String> {
     run(&file_text).map_err(|e| e.to_string())
 }
 
-fn run(file: &str) -> Result<(), AmystError> {
+fn run(file: &'_ str) -> Result<(), AmystError<'_>> {
     let scanner = Scanner::new(file);
     let tokens = scanner.scan_tokens()?;
-    let mut parser = amyst_core::core::Parser::new(tokens);
+    let mut parser = amyst_core::parser::Parser::new(tokens);
     let mut ast = AST::new();
     let stmts = parser.parse(&mut ast)?;
     let mut interpreter = Interpreter::new();

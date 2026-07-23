@@ -1,33 +1,14 @@
 use crate::AmystError;
-use crate::core::env::ScopeStack;
-use crate::core::expr::{AST, ExprId, LiteralValue, StmtId, evaluate};
-use crate::core::interpreter::Interpreter;
-use crate::core::scanner::Token;
+use crate::ast::{AST, ExprId, evaluate, Param, AmystType};
+use crate::interpreter::{Interpreter, Value};
+use crate::lexer::Token;
 
 #[derive(Clone, PartialEq, Debug)]
-pub enum AmystType {
-    Int,
-    Float,
-    String,
-    Bool,
-    Unit,
-    Named(String),
-    Option(Box<AmystType>),
-}
-
-#[derive(Clone, PartialEq, Debug)]
-pub struct Param<'a> {
-    pub name: Token<'a>,
-    pub is_mut: bool,
-    pub type_annotation: Option<AmystType>,
-}
-
-#[derive(Clone, PartialEq, Debug)]
-pub(crate) enum AmystCallable<'a> {
+pub enum AmystCallable<'a> {
     Native {
         arity: usize,
         name: &'a str,
-        func: fn(&[LiteralValue<'a>]) -> Result<LiteralValue<'a>, AmystError<'a>>,
+        func: fn(&[Value<'a>]) -> Result<Value<'a>, AmystError<'a>>,
     },
     UserDefined {
         name: Token<'a>,
@@ -40,10 +21,10 @@ pub(crate) enum AmystCallable<'a> {
 impl<'a> AmystCallable<'a> {
     pub(crate) fn call(
         &self,
-        args: &[LiteralValue<'a>],
+        args: &[Value<'a>],
         interpreter: &mut Interpreter<'a>,
         ast: &AST<'a>,
-    ) -> Result<LiteralValue<'a>, AmystError<'a>> {
+    ) -> Result<Value<'a>, AmystError<'a>> {
         match self {
             AmystCallable::Native { func, .. } => func(args),
             AmystCallable::UserDefined { params, body, .. } => {

@@ -1,8 +1,14 @@
-use crate::core::callable::AmystCallable;
-use crate::core::env::ScopeStack;
-use crate::core::expr::{AST, LiteralValue, Stmt, StmtId, evaluate};
-use crate::{AmystError, report_error};
+mod environment;
+mod value;
+mod callable;
+
+pub use value::Value;
+pub use callable::{AmystCallable};
+
 use std::time::{SystemTime, UNIX_EPOCH};
+use crate::{report_error, AmystError};
+use crate::ast::{evaluate, Stmt, StmtId, AST};
+use crate::interpreter::environment::ScopeStack;
 pub struct Interpreter<'a> {
     pub env: ScopeStack<'a>,
 }
@@ -13,11 +19,11 @@ impl<'a> Interpreter<'a> {
 
         env.define_global(
             "clock",
-            LiteralValue::Callable(AmystCallable::Native {
+            Value::Callable(AmystCallable::Native {
                 arity: 0,
                 name: "clock",
                 func: |_args| {
-                    Ok(LiteralValue::Number(
+                    Ok(Value::Number(
                         SystemTime::now()
                             .duration_since(UNIX_EPOCH)
                             .unwrap()
@@ -63,7 +69,7 @@ impl<'a> Interpreter<'a> {
                             "Variable should have an initial value.",
                         ),
                     });
-                    self.env.define(name.lexeme, LiteralValue::Unit)
+                    self.env.define(name.lexeme, Value::Unit)
                 }
             }
             Stmt::While { condition, body } => {
@@ -78,7 +84,7 @@ impl<'a> Interpreter<'a> {
             } => {
                 let iterator = evaluate(ast, self, *iterable)?;
                 match iterator {
-                    LiteralValue::Range {
+                    Value::Range {
                         start,
                         end,
                         inclusive,
@@ -92,7 +98,7 @@ impl<'a> Interpreter<'a> {
                         for i in iter {
                             self.env.push_scope();
                             self.env
-                                .define(variable.lexeme, LiteralValue::Number(i as f64));
+                                .define(variable.lexeme, Value::Number(i as f64));
                             let result = self.execute(ast, *body);
                             self.env.pop_scope();
 
@@ -113,7 +119,7 @@ impl<'a> Interpreter<'a> {
                 return_type,
             } => env.define(
                 name.lexeme,
-                LiteralValue::Callable(AmystCallable::UserDefined {
+                Value::Callable(AmystCallable::UserDefined {
                     name: (*name).clone(),
                     params: (*params).clone(),
                     body: *body,
@@ -134,12 +140,12 @@ impl<'a> Interpreter<'a> {
         Ok(())
     }
 
-    fn stringify(&self, val: LiteralValue) -> String {
+    fn stringify(&self, val: Value) -> String {
         match val {
-            LiteralValue::Number(n) => n.to_string(),
-            LiteralValue::String(s) => s.to_string(),
-            LiteralValue::Boolean(b) => String::from(if b { "true" } else { "false" }),
-            LiteralValue::Range {
+            Value::Number(n) => n.to_string(),
+            Value::String(s) => s.to_string(),
+            Value::Boolean(b) => String::from(if b { "true" } else { "false" }),
+            Value::Range {
                 start,
                 end,
                 inclusive,
@@ -150,8 +156,8 @@ impl<'a> Interpreter<'a> {
                     format!("{start}..{end}")
                 }
             }
-            LiteralValue::Unit => String::from("()"),
-            LiteralValue::Callable(func) => match func {
+            Value::Unit => String::from("()"),
+            Value::Callable(func) => match func {
                 AmystCallable::Native { name, .. } => format!("<native fn {name}>"),
                 AmystCallable::UserDefined { name, .. } => format!("<fn {}>", name.lexeme),
             },
@@ -159,9 +165,9 @@ impl<'a> Interpreter<'a> {
     }
 }
 
-pub(crate) fn is_truthy<'a>(val: &LiteralValue) -> Result<bool, AmystError<'a>> {
+pub fn is_truthy<'a>(val: &Value) -> Result<bool, AmystError<'a>> {
     match val {
-        LiteralValue::Boolean(b) => Ok(*b),
+        Value::Boolean(b) => Ok(*b),
         _ => {
             let message = String::from("Expected boolean expression");
             Err(AmystError::Runtime { message })
