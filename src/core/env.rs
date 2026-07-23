@@ -37,7 +37,7 @@ impl<'a> ScopeStack<'a> {
         }
     }
 
-    pub(crate) fn get(&self, name: &Token<'a>) -> Result<LiteralValue<'a>, AmystError> {
+    pub(crate) fn get(&self, name: &Token<'a>) -> Result<LiteralValue<'a>, AmystError<'a>> {
         for scope in self.scopes.iter().rev() {
             if let Some(val) = scope.get(name.lexeme) {
                 return Ok(val.clone());
@@ -57,7 +57,7 @@ impl<'a> ScopeStack<'a> {
         &mut self,
         tk: &Token<'a>,
         val: LiteralValue<'a>,
-    ) -> Result<LiteralValue<'a>, AmystError> {
+    ) -> Result<LiteralValue<'a>, AmystError<'a>> {
         let name = tk.lexeme;
 
         for scope in self.scopes.iter_mut().rev() {

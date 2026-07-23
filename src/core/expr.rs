@@ -73,6 +73,10 @@ pub enum Stmt<'a> {
         else_branch: Option<StmtId>,
     },
     Print(ExprId),
+    Return {
+        keyword: Token<'a>,
+        value: ExprId,
+    },
     For {
         variable: Token<'a>,
         iterable: ExprId,
@@ -126,7 +130,7 @@ pub(crate) fn evaluate<'a>(
     ast: &AST<'a>,
     interpreter: &mut Interpreter<'a>,
     id: ExprId,
-) -> Result<LiteralValue<'a>, AmystError> {
+) -> Result<LiteralValue<'a>, AmystError<'a>> {
     let node = ast.get_node(id);
 
     match node {
@@ -353,7 +357,7 @@ mod test {
     use std::borrow::Cow;
 
     #[test]
-    fn literal_value_expression_has_expected_result() -> Result<(), AmystError> {
+    fn literal_value_expression_has_expected_result<'a>() -> Result<(), AmystError<'a>> {
         let mut ast = AST::new();
         let id = ast.add_node(ExprKind::Literal(LiteralValue::Number(32.0)));
         let id_ev = ast.add_node(ExprKind::Grouping(id));
@@ -363,7 +367,7 @@ mod test {
     }
 
     #[test]
-    fn unitary_expression_evaluation_has_expected_result() -> Result<(), AmystError> {
+    fn unitary_expression_evaluation_has_expected_result<'a>() -> Result<(), AmystError<'a>> {
         let mut ast = AST::new();
         let right = ast.add_node(ExprKind::Literal(LiteralValue::Number(32.0)));
         let id = ast.add_node(ExprKind::Unary {
@@ -390,7 +394,7 @@ mod test {
     }
 
     #[test]
-    fn unitary_evaluation_errors_are_displayed() -> Result<(), AmystError> {
+    fn unitary_evaluation_errors_are_displayed<'a>() -> Result<(), AmystError<'a>> {
         let mut ast = AST::new();
         let mut env = Interpreter::new();
         let right = ast.add_node(ExprKind::Literal(LiteralValue::Number(32.0)));
@@ -433,7 +437,7 @@ mod test {
     }
 
     #[test]
-    fn binary_expression_evaluation_has_expected_result() -> Result<(), AmystError> {
+    fn binary_expression_evaluation_has_expected_result<'a>() -> Result<(), AmystError<'a>> {
         let mut ast = AST::new();
         let mut env = Interpreter::new();
         let operations = vec![

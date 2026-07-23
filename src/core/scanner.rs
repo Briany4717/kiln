@@ -85,7 +85,7 @@ impl<'a> Scanner<'a> {
         }
     }
 
-    pub fn scan_tokens(mut self) -> Result<Vec<Token<'a>>, AmystError> {
+    pub fn scan_tokens(mut self) -> Result<Vec<Token<'a>>, AmystError<'a>> {
         while !self.is_at_end() {
             self.start = self.current;
             self.scan_token()?;
@@ -100,7 +100,7 @@ impl<'a> Scanner<'a> {
         Ok(self.tokens)
     }
 
-    fn scan_token(&mut self) -> Result<(), AmystError> {
+    fn scan_token(&mut self) -> Result<(), AmystError<'a>> {
         let c = self.advance();
         match c {
             ':' => Ok(self.add_token(TokenType::Colon)),
@@ -227,7 +227,7 @@ impl<'a> Scanner<'a> {
         self.add_token(token_type);
     }
 
-    fn add_number_token(&mut self) -> Result<(), AmystError> {
+    fn add_number_token(&mut self) -> Result<(), AmystError<'a>> {
         while self.peek().is_some() && self.peek().unwrap().is_digit(10) {
             self.advance();
         }
@@ -243,7 +243,7 @@ impl<'a> Scanner<'a> {
             Err(_) => Err(AmystError::InvalidNumberFormat),
         }
     }
-    fn add_string_token(&mut self) -> Result<(), AmystError> {
+    fn add_string_token(&mut self) -> Result<(), AmystError<'a>> {
         while self.peek() != Some('"') && !self.is_at_end() {
             if self.peek() == Some('\n') {
                 self.line += 1;

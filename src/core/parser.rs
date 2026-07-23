@@ -5,16 +5,16 @@ use crate::{AmystError, report_error};
 use std::borrow::Cow;
 
 pub struct Parser<'a> {
-    tokens: &'a [Token<'a>],
+    tokens: Vec<Token<'a>>,
     current: usize,
 }
 
 impl<'a> Parser<'a> {
-    pub fn new(tokens: &'a [Token<'a>]) -> Self {
+    pub fn new(tokens: Vec<Token<'a>>) -> Self {
         Self { tokens, current: 0 }
     }
 
-    pub(crate) fn parse(&mut self, ast: &mut AST<'a>) -> Result<Vec<StmtId>, AmystError> {
+    pub(crate) fn parse(&mut self, ast: &mut AST<'a>) -> Result<Vec<StmtId>, AmystError<'a>> {
         let mut root_stmt = Vec::new();
         let mut errors = Vec::new();
         while !self.is_at_end() {
@@ -37,11 +37,11 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn expression(&mut self, ast: &mut AST<'a>) -> Result<ExprId, AmystError> {
+    fn expression(&mut self, ast: &mut AST<'a>) -> Result<ExprId, AmystError<'a>> {
         self.assignment(ast)
     }
 
-    fn declaration(&mut self, ast: &mut AST<'a>) -> Result<Stmt<'a>, AmystError> {
+    fn declaration(&mut self, ast: &mut AST<'a>) -> Result<Stmt<'a>, AmystError<'a>> {
         if self.matches(&[TokenType::Fn]) {
             self.function(ast, "function")
         } else if self.matches(&[TokenType::Let]) {
@@ -51,13 +51,15 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn statement(&mut self, ast: &mut AST<'a>) -> Result<Stmt<'a>, AmystError> {
+    fn statement(&mut self, ast: &mut AST<'a>) -> Result<Stmt<'a>, AmystError<'a>> {
         if self.matches(&[TokenType::For]) {
             self.for_stmt(ast)
         } else if self.matches(&[TokenType::If]) {
             self.if_stmt(ast)
         } else if self.matches(&[TokenType::Print]) {
             self.print_stmt(ast)
+        } else if self.matches(&[TokenType::Return]) {
+            self.return_stmt(ast)
         } else if self.matches(&[TokenType::While]) {
             self.while_stmt(ast)
         } else if self.matches(&[TokenType::LeftBrace]) {
@@ -67,7 +69,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn for_stmt(&mut self, ast: &mut AST<'a>) -> Result<Stmt<'a>, AmystError> {
+    fn for_stmt(&mut self, ast: &mut AST<'a>) -> Result<Stmt<'a>, AmystError<'a>> {
         let variable = self.consume_identifier("Expected an identifier.")?;
         self.consume(TokenType::In, "Expected 'in'.")?;
 
@@ -81,7 +83,7 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn if_stmt(&mut self, ast: &mut AST<'a>) -> Result<Stmt<'a>, AmystError> {
+    fn if_stmt(&mut self, ast: &mut AST<'a>) -> Result<Stmt<'a>, AmystError<'a>> {
         let condition = self.expression(ast)?;
         let stmt = self.statement(ast)?;
         let then_branch = ast.add_stmt(stmt);
@@ -98,13 +100,25 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn print_stmt(&mut self, ast: &mut AST<'a>) -> Result<Stmt<'a>, AmystError> {
+    fn print_stmt(&mut self, ast: &mut AST<'a>) -> Result<Stmt<'a>, AmystError<'a>> {
         let val = self.expression(ast)?;
         self.consume(TokenType::Semicolon, "Expect ';' after value.")?;
         Ok(Stmt::Print(val))
     }
 
-    fn var_declaration(&mut self, ast: &mut AST<'a>) -> Result<Stmt<'a>, AmystError> {
+    fn return_stmt(&mut self, ast: &mut AST<'a>) -> Result<Stmt<'a>, AmystError<'a>> {
+        let keyword = self.previous();
+
+        let value = if !self.check(&TokenType::Semicolon) {
+            self.expression(ast)?
+        } else {
+            ast.add_node(ExprKind::Literal(LiteralValue::Unit))
+        };
+        self.consume(TokenType::Semicolon, "Expect ';' after return value")?;
+        Ok(Stmt::Return { keyword, value })
+    }
+
+    fn var_declaration(&mut self, ast: &mut AST<'a>) -> Result<Stmt<'a>, AmystError<'a>> {
         let name = self.consume_identifier("Expect variable name.")?;
         let mut initializer = None;
         if self.matches(&[TokenType::Equal]) {
@@ -118,20 +132,20 @@ impl<'a> Parser<'a> {
         Ok(Stmt::Var { name, initializer })
     }
 
-    fn while_stmt(&mut self, ast: &mut AST<'a>) -> Result<Stmt<'a>, AmystError> {
+    fn while_stmt(&mut self, ast: &mut AST<'a>) -> Result<Stmt<'a>, AmystError<'a>> {
         let condition = self.expression(ast)?;
         let body_stmt = self.statement(ast)?;
         let body = ast.add_stmt(body_stmt);
         Ok(Stmt::While { condition, body })
     }
 
-    fn expression_stmt(&mut self, ast: &mut AST<'a>) -> Result<Stmt<'a>, AmystError> {
+    fn expression_stmt(&mut self, ast: &mut AST<'a>) -> Result<Stmt<'a>, AmystError<'a>> {
         let val = self.expression(ast)?;
         self.consume(TokenType::Semicolon, "Expect ';' after expression.")?;
         Ok(Stmt::Expression(val))
     }
 
-    fn function(&mut self, ast: &mut AST<'a>, kind: &'a str) -> Result<Stmt<'a>, AmystError> {
+    fn function(&mut self, ast: &mut AST<'a>, kind: &'a str) -> Result<Stmt<'a>, AmystError<'a>> {
         let name = self.consume_identifier(&format!("Expect {} name.", kind))?;
         self.consume(
             TokenType::LeftParen,
@@ -201,7 +215,7 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn parse_type(&mut self, message: &str) -> Result<AmystType, AmystError> {
+    fn parse_type(&mut self, message: &str) -> Result<AmystType, AmystError<'a>> {
         if self.matches(&[TokenType::LeftParen]) {
             self.consume(TokenType::RightParen, "Expected ')' to close unit type.")?;
             return Ok(AmystType::Unit);
@@ -219,7 +233,7 @@ impl<'a> Parser<'a> {
         Ok(ty)
     }
 
-    fn block(&mut self, ast: &mut AST<'a>) -> Result<Vec<StmtId>, AmystError> {
+    fn block(&mut self, ast: &mut AST<'a>) -> Result<Vec<StmtId>, AmystError<'a>> {
         let mut stmts = Vec::new();
         while !self.check(&TokenType::RightBrace) && !self.is_at_end() {
             let stmt = self.declaration(ast)?;
@@ -229,7 +243,7 @@ impl<'a> Parser<'a> {
         Ok(stmts)
     }
 
-    fn assignment(&mut self, ast: &mut AST<'a>) -> Result<ExprId, AmystError> {
+    fn assignment(&mut self, ast: &mut AST<'a>) -> Result<ExprId, AmystError<'a>> {
         let expr = self.range(ast)?;
 
         if self.matches(&[TokenType::Equal]) {
@@ -249,7 +263,7 @@ impl<'a> Parser<'a> {
         Ok(expr)
     }
 
-    fn range(&mut self, ast: &mut AST<'a>) -> Result<ExprId, AmystError> {
+    fn range(&mut self, ast: &mut AST<'a>) -> Result<ExprId, AmystError<'a>> {
         let mut expr = self.or(ast)?;
 
         if self.matches(&[TokenType::DotDot, TokenType::DotDotEqual]) {
@@ -266,7 +280,7 @@ impl<'a> Parser<'a> {
         Ok(expr)
     }
 
-    fn or(&mut self, ast: &mut AST<'a>) -> Result<ExprId, AmystError> {
+    fn or(&mut self, ast: &mut AST<'a>) -> Result<ExprId, AmystError<'a>> {
         let mut expr = self.and(ast)?;
 
         while self.matches(&[TokenType::Or]) {
@@ -282,7 +296,7 @@ impl<'a> Parser<'a> {
         Ok(expr)
     }
 
-    fn and(&mut self, ast: &mut AST<'a>) -> Result<ExprId, AmystError> {
+    fn and(&mut self, ast: &mut AST<'a>) -> Result<ExprId, AmystError<'a>> {
         let mut expr = self.equality(ast)?;
 
         while self.matches(&[TokenType::And]) {
@@ -298,7 +312,7 @@ impl<'a> Parser<'a> {
         Ok(expr)
     }
 
-    fn equality(&mut self, ast: &mut AST<'a>) -> Result<ExprId, AmystError> {
+    fn equality(&mut self, ast: &mut AST<'a>) -> Result<ExprId, AmystError<'a>> {
         let mut expr = self.comparison(ast)?;
         while self.matches(&[TokenType::BangEqual, TokenType::EqualEqual]) {
             let operator = self.previous();
@@ -312,7 +326,7 @@ impl<'a> Parser<'a> {
         Ok(expr)
     }
 
-    fn comparison(&mut self, ast: &mut AST<'a>) -> Result<ExprId, AmystError> {
+    fn comparison(&mut self, ast: &mut AST<'a>) -> Result<ExprId, AmystError<'a>> {
         let mut expr = self.term(ast)?;
 
         while self.matches(&[
@@ -333,7 +347,7 @@ impl<'a> Parser<'a> {
         Ok(expr)
     }
 
-    fn term(&mut self, ast: &mut AST<'a>) -> Result<ExprId, AmystError> {
+    fn term(&mut self, ast: &mut AST<'a>) -> Result<ExprId, AmystError<'a>> {
         let mut expr = self.factor(ast)?;
 
         while self.matches(&[TokenType::Minus, TokenType::Plus]) {
@@ -349,7 +363,7 @@ impl<'a> Parser<'a> {
         Ok(expr)
     }
 
-    fn factor(&mut self, ast: &mut AST<'a>) -> Result<ExprId, AmystError> {
+    fn factor(&mut self, ast: &mut AST<'a>) -> Result<ExprId, AmystError<'a>> {
         let mut expr = self.unary(ast)?;
 
         while self.matches(&[TokenType::Slash, TokenType::Star]) {
@@ -365,7 +379,7 @@ impl<'a> Parser<'a> {
         Ok(expr)
     }
 
-    fn unary(&mut self, ast: &mut AST<'a>) -> Result<ExprId, AmystError> {
+    fn unary(&mut self, ast: &mut AST<'a>) -> Result<ExprId, AmystError<'a>> {
         if self.matches(&[TokenType::Bang, TokenType::Minus]) {
             let operator = self.previous();
             let right = self.unary(ast)?;
@@ -375,7 +389,7 @@ impl<'a> Parser<'a> {
         self.call(ast)
     }
 
-    fn finish_call(&mut self, ast: &mut AST<'a>, callee: ExprId) -> Result<ExprId, AmystError> {
+    fn finish_call(&mut self, ast: &mut AST<'a>, callee: ExprId) -> Result<ExprId, AmystError<'a>> {
         let mut arguments = Vec::new();
         if !self.check(&TokenType::RightParen) {
             arguments.push(self.expression(ast)?);
@@ -392,7 +406,7 @@ impl<'a> Parser<'a> {
         }))
     }
 
-    fn call(&mut self, ast: &mut AST<'a>) -> Result<ExprId, AmystError> {
+    fn call(&mut self, ast: &mut AST<'a>) -> Result<ExprId, AmystError<'a>> {
         let mut expr = self.primary(ast)?;
         loop {
             if self.matches(&[TokenType::LeftParen]) {
@@ -405,7 +419,7 @@ impl<'a> Parser<'a> {
         Ok(expr)
     }
 
-    fn primary(&mut self, ast: &mut AST<'a>) -> Result<ExprId, AmystError> {
+    fn primary(&mut self, ast: &mut AST<'a>) -> Result<ExprId, AmystError<'a>> {
         if self.is_at_end() {
             return Err(AmystError::Runtime {
                 message: "Invalid token".to_string(),
@@ -448,7 +462,7 @@ impl<'a> Parser<'a> {
         &mut self,
         token_type: TokenType<'a>,
         message: &str,
-    ) -> Result<Token<'a>, AmystError> {
+    ) -> Result<Token<'a>, AmystError<'a>> {
         let tok = token_type.clone();
         if self.check(&token_type) {
             return Ok(self.advance());
@@ -467,7 +481,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn consume_identifier(&mut self, message: &str) -> Result<Token<'a>, AmystError> {
+    fn consume_identifier(&mut self, message: &str) -> Result<Token<'a>, AmystError<'a>> {
         if matches!(self.peek().token_type, TokenType::Identifier(_)) {
             Ok(self.advance())
         } else {
@@ -533,7 +547,7 @@ impl<'a> Parser<'a> {
     }
 }
 
-pub(crate) fn ensure_int(val: f64) -> Result<i32, AmystError> {
+pub(crate) fn ensure_int<'a>(val: f64) -> Result<i32, AmystError<'a>> {
     if val.fract() != 0.0 {
         let message = String::from("Float has a fractional component and is not a whole integer");
         return Err(AmystError::Runtime { message });
@@ -555,11 +569,11 @@ mod test {
     use crate::core::parser::Parser;
 
     #[test]
-    fn parsing_test() -> Result<(), AmystError> {
+    fn parsing_test<'a>() -> Result<(), AmystError<'a>> {
         let mut ast = AST::new();
         let scanner = Scanner::new("1 + 2 * 3");
         let tokens = scanner.scan_tokens()?;
-        let mut parser = Parser::new(&*tokens);
+        let mut parser = Parser::new(tokens);
         let id = parser.expression(&mut ast)?;
         assert_eq!(format_ast(&ast, id), "(+ 1 (* 2 3))");
         Ok(())

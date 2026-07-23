@@ -27,7 +27,7 @@ pub(crate) enum AmystCallable<'a> {
     Native {
         arity: usize,
         name: &'a str,
-        func: fn(&[LiteralValue<'a>]) -> Result<LiteralValue<'a>, AmystError>,
+        func: fn(&[LiteralValue<'a>]) -> Result<LiteralValue<'a>, AmystError<'a>>,
     },
     UserDefined {
         name: Token<'a>,
@@ -43,7 +43,7 @@ impl<'a> AmystCallable<'a> {
         args: &[LiteralValue<'a>],
         interpreter: &mut Interpreter<'a>,
         ast: &AST<'a>,
-    ) -> Result<LiteralValue<'a>, AmystError> {
+    ) -> Result<LiteralValue<'a>, AmystError<'a>> {
         match self {
             AmystCallable::Native { func, .. } => func(args),
             AmystCallable::UserDefined { params, body, .. } => {
@@ -55,8 +55,11 @@ impl<'a> AmystCallable<'a> {
                 }
                 let res = interpreter.execute(ast, *body);
                 interpreter.env.pop_scope();
-                res?;
-                Ok(LiteralValue::Unit)
+                match res {
+                    Ok(()) => Ok(LiteralValue::Unit),
+                    Err(AmystError::Return(val)) => Ok(val),
+                    Err(err) => Err(err),
+                }
             }
         }
     }

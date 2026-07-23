@@ -34,14 +34,14 @@ impl<'a> Interpreter<'a> {
         &mut self,
         ast: &AST<'a>,
         statements: &[StmtId],
-    ) -> Result<(), AmystError> {
+    ) -> Result<(), AmystError<'a>> {
         for stmt_id in statements {
             self.execute(ast, *stmt_id)?;
         }
         Ok(())
     }
 
-    pub(crate) fn execute(&mut self, ast: &AST<'a>, stmt_id: StmtId) -> Result<(), AmystError> {
+    pub(crate) fn execute(&mut self, ast: &AST<'a>, stmt_id: StmtId) -> Result<(), AmystError<'a>> {
         let env = &mut self.env;
         match ast.get_stmt(stmt_id) {
             Stmt::Print(id) => {
@@ -138,6 +138,10 @@ impl<'a> Interpreter<'a> {
                     return_type: (*return_type).clone(),
                 }),
             ),
+            Stmt::Return { value, .. } => {
+                let val = evaluate(ast, self, *value)?;
+                return Err(AmystError::Return(val));
+            }
         }
         Ok(())
     }
@@ -167,7 +171,7 @@ impl<'a> Interpreter<'a> {
     }
 }
 
-pub(crate) fn is_truthy(val: &LiteralValue) -> Result<bool, AmystError> {
+pub(crate) fn is_truthy<'a>(val: &LiteralValue) -> Result<bool, AmystError<'a>> {
     match val {
         LiteralValue::Boolean(b) => Ok(*b),
         _ => {
