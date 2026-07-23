@@ -1,5 +1,5 @@
-use std::borrow::Cow;
 use crate::interpreter::callable::AmystCallable;
+use std::borrow::Cow;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value<'a> {

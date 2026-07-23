@@ -1,15 +1,13 @@
-use std::path::PathBuf;
-use amyst_core::lexer::Scanner;
+use amyst_core::AmystError;
 use amyst_core::ast::AST;
 use amyst_core::interpreter::Interpreter;
-use amyst_core::AmystError;
+use amyst_core::lexer::Scanner;
 use clap::{Parser, Subcommand};
-
+use std::path::PathBuf;
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
 struct Cli {
-
     #[command(subcommand)]
     command: Commands,
 }
@@ -34,8 +32,6 @@ fn main() {
             }
         }
     }
-
-
 }
 
 fn run_file(file: &str) -> Result<(), String> {

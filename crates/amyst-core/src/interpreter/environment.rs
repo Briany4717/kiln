@@ -1,7 +1,7 @@
-use crate::{AmystError, report_error};
-use std::collections::HashMap;
 use crate::interpreter::Value;
 use crate::lexer::Token;
+use crate::{AmystError, report_error};
+use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
 pub struct ScopeStack<'a> {

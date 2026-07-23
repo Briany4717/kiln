@@ -1,6 +1,6 @@
 use crate::AmystError;
-use std::str::FromStr;
 use crate::lexer::token::{Token, TokenType};
+use std::str::FromStr;
 
 pub struct Scanner<'a> {
     source: &'a str,

@@ -1,9 +1,8 @@
-
-use crate::ast::{AST, ExprId, ExprKind, Stmt, StmtId, AmystType, Param};
-use crate::{AmystError, report_error};
-use std::borrow::Cow;
+use crate::ast::{AST, AmystType, ExprId, ExprKind, Param, Stmt, StmtId};
 use crate::interpreter::Value;
 use crate::lexer::{Token, TokenType};
+use crate::{AmystError, report_error};
+use std::borrow::Cow;
 
 pub struct Parser<'a> {
     tokens: Vec<Token<'a>>,
@@ -624,8 +623,8 @@ pub fn ensure_int<'a>(val: f64) -> Result<i32, AmystError<'a>> {
 mod test {
     use crate::AmystError;
     use crate::ast::{AST, format_ast};
-    use crate::parser::parser::Parser;
     use crate::lexer::Scanner;
+    use crate::parser::parser::Parser;
 
     #[test]
     fn parsing_test<'a>() -> Result<(), AmystError<'a>> {

@@ -1,5 +1,5 @@
 use crate::AmystError;
-use crate::ast::{AST, ExprId, evaluate, Param, AmystType};
+use crate::ast::{AST, AmystType, ExprId, Param, evaluate};
 use crate::interpreter::{Interpreter, Value};
 use crate::lexer::Token;
 

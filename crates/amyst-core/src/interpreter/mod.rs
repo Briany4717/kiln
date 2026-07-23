@@ -1,14 +1,14 @@
+mod callable;
 mod environment;
 mod value;
-mod callable;
 
+pub use callable::AmystCallable;
 pub use value::Value;
-pub use callable::{AmystCallable};
 
-use std::time::{SystemTime, UNIX_EPOCH};
-use crate::{report_error, AmystError};
-use crate::ast::{evaluate, Stmt, StmtId, AST};
+use crate::ast::{AST, Stmt, StmtId, evaluate};
 use crate::interpreter::environment::ScopeStack;
+use crate::{AmystError, report_error};
+use std::time::{SystemTime, UNIX_EPOCH};
 pub struct Interpreter<'a> {
     pub env: ScopeStack<'a>,
 }
@@ -97,8 +97,7 @@ impl<'a> Interpreter<'a> {
 
                         for i in iter {
                             self.env.push_scope();
-                            self.env
-                                .define(variable.lexeme, Value::Number(i as f64));
+                            self.env.define(variable.lexeme, Value::Number(i as f64));
                             let result = self.execute(ast, *body);
                             self.env.pop_scope();
 

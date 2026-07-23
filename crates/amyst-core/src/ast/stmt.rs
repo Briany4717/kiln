@@ -1,4 +1,4 @@
-use crate::ast::{ExprId,AmystType, Param};
+use crate::ast::{AmystType, ExprId, Param};
 use crate::lexer::Token;
 
 pub type StmtId = usize;

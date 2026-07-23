@@ -4,13 +4,13 @@ mod types;
 
 pub use expr::{ExprId, ExprKind};
 pub use stmt::{Stmt, StmtId};
-pub use types::{AmystType,Param};
+pub use types::{AmystType, Param};
 
-use std::borrow::Cow;
-use crate::{report_error, AmystError};
-use crate::interpreter::{is_truthy, Interpreter, Value};
-use crate::parser::ensure_int;
+use crate::interpreter::{Interpreter, Value, is_truthy};
 use crate::lexer::TokenType;
+use crate::parser::ensure_int;
+use crate::{AmystError, report_error};
+use std::borrow::Cow;
 
 pub struct AST<'a> {
     expressions: Vec<ExprKind<'a>>,
@@ -306,8 +306,8 @@ mod test {
     use crate::AmystError;
     use crate::ast::{AST, ExprKind, evaluate};
     use crate::interpreter::{Interpreter, Value};
-    use std::borrow::Cow;
     use crate::lexer::{Token, TokenType};
+    use std::borrow::Cow;
 
     #[test]
     fn literal_value_expression_has_expected_result<'a>() -> Result<(), AmystError<'a>> {
@@ -362,10 +362,7 @@ mod test {
         assert_eq!(
             evaluate(&ast, &mut env, id).err(),
             Some(AmystError::Runtime {
-                message: format!(
-                    "Invalid ! operand for {:?} literal",
-                    Value::Number(32.0)
-                )
+                message: format!("Invalid ! operand for {:?} literal", Value::Number(32.0))
             })
         );
         let right = ast.add_node(ExprKind::Literal(Value::Boolean(false)));
@@ -380,10 +377,7 @@ mod test {
         assert_eq!(
             evaluate(&ast, &mut env, id).err(),
             Some(AmystError::Runtime {
-                message: format!(
-                    "Invalid - operand for {:?} literal",
-                    Value::Boolean(false)
-                )
+                message: format!("Invalid - operand for {:?} literal", Value::Boolean(false))
             })
         );
         Ok(())
@@ -461,9 +455,7 @@ mod test {
         }
 
         let left = ast.add_node(ExprKind::Literal(Value::String(Cow::from("Hola"))));
-        let right = ast.add_node(ExprKind::Literal(Value::String(Cow::from(
-            " Mundo!",
-        ))));
+        let right = ast.add_node(ExprKind::Literal(Value::String(Cow::from(" Mundo!"))));
         let operator = Token {
             token_type: TokenType::Plus,
             lexeme: "",

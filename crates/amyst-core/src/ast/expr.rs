@@ -1,6 +1,6 @@
-use crate::lexer::{Token};
-use crate::ast::{StmtId};
+use crate::ast::StmtId;
 use crate::interpreter::Value;
+use crate::lexer::Token;
 
 pub type ExprId = usize;
 
