@@ -1,14 +1,13 @@
-use crate::{report_error, AmystError};
+use crate::core::callable::{AmystCallable, AmystType, Param};
 use crate::core::env::ScopeStack;
-use crate::core::interpreter::{is_truthy, Interpreter};
+use crate::core::interpreter::{Interpreter, is_truthy};
 use crate::core::parser::ensure_int;
 use crate::core::scanner::{Token, TokenType};
+use crate::{AmystError, report_error};
 use std::borrow::Cow;
-use crate::core::callable::{AmystCallable, AmystType, Param};
-
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum LiteralValue<'a> {
+pub(crate) enum LiteralValue<'a> {
     Number(f64),
     String(Cow<'a, str>),
     Boolean(bool),
@@ -18,7 +17,7 @@ pub enum LiteralValue<'a> {
         inclusive: bool,
     },
     Callable(AmystCallable<'a>),
-    Nil,
+    Unit,
 }
 
 pub type ExprId = usize;
@@ -34,7 +33,7 @@ pub enum ExprKind<'a> {
     Call {
         callee: ExprId,
         paren: Token<'a>,
-        arguments: Vec<ExprId>
+        arguments: Vec<ExprId>,
     },
     Range {
         start: ExprId,
@@ -66,7 +65,7 @@ pub enum Stmt<'a> {
         name: Token<'a>,
         params: Vec<Param<'a>>,
         body: StmtId,
-        return_type: Option<AmystType>
+        return_type: Option<AmystType>,
     },
     If {
         condition: ExprId,
@@ -148,7 +147,7 @@ pub(crate) fn evaluate<'a>(
                         message: format!("Invalid ! operand for {:?} literal", right_val),
                     }),
                 },
-                _ => Ok(LiteralValue::Nil),
+                _ => Ok(LiteralValue::Unit),
             }
         }
         ExprKind::Binary {
@@ -243,11 +242,15 @@ pub(crate) fn evaluate<'a>(
                 }),
             }
         }
-        ExprKind::Call {callee,paren,arguments: expr_args} => {
-            let callee_val = evaluate(ast, interpreter,*callee)?;
+        ExprKind::Call {
+            callee,
+            paren,
+            arguments: expr_args,
+        } => {
+            let callee_val = evaluate(ast, interpreter, *callee)?;
             let mut arguments = Vec::new();
             for arg in expr_args {
-                arguments.push(evaluate(ast, interpreter,*arg)?);
+                arguments.push(evaluate(ast, interpreter, *arg)?);
             }
 
             let function = match callee_val {
@@ -268,17 +271,19 @@ pub(crate) fn evaluate<'a>(
                     message: report_error(
                         paren.line,
                         Some(&format!(" at '{}'", paren.lexeme)),
-                        &format!("Expected {} arguments but got {} instead.", function.arity(),arguments.len()),
+                        &format!(
+                            "Expected {} arguments but got {} instead.",
+                            function.arity(),
+                            arguments.len()
+                        ),
                     ),
                 });
             }
 
-            function.call(&arguments, interpreter,ast)
-
+            function.call(&arguments, interpreter, ast)
         }
     }
 }
-
 
 pub fn format_ast(ast: &AST, id: ExprId) -> String {
     let node = ast.get_node(id);
@@ -298,8 +303,10 @@ pub fn format_ast(ast: &AST, id: ExprId) -> String {
                     format!("{start}..{end}")
                 }
             }
-            LiteralValue::Nil => "Nil".to_string(),
-            _ => {todo!()}
+            LiteralValue::Unit => "()".to_string(),
+            _ => {
+                todo!()
+            }
         },
         ExprKind::Range {
             start,
@@ -341,9 +348,9 @@ mod test {
     use crate::AmystError;
     use crate::core::env::ScopeStack;
     use crate::core::expr::{AST, ExprKind, LiteralValue, evaluate};
+    use crate::core::interpreter::Interpreter;
     use crate::core::scanner::{Token, TokenType};
     use std::borrow::Cow;
-    use crate::core::interpreter::Interpreter;
 
     #[test]
     fn literal_value_expression_has_expected_result() -> Result<(), AmystError> {

@@ -1,8 +1,8 @@
-use std::time::{SystemTime, UNIX_EPOCH};
-use crate::AmystError;
-use crate::core::env::ScopeStack;
-use crate::core::expr::{LiteralValue, Stmt, StmtId, evaluate, AST};
 use crate::core::callable::AmystCallable;
+use crate::core::env::ScopeStack;
+use crate::core::expr::{AST, LiteralValue, Stmt, StmtId, evaluate};
+use crate::{AmystError, report_error};
+use std::time::{SystemTime, UNIX_EPOCH};
 pub struct Interpreter<'a> {
     pub env: ScopeStack<'a>,
 }
@@ -11,15 +11,23 @@ impl<'a> Interpreter<'a> {
     pub fn new() -> Self {
         let mut env = ScopeStack::new();
 
-        env.define_global("clock", LiteralValue::Callable(AmystCallable::Native {
-            arity: 0,
-            name: "clock",
-            func: |_args|{Ok(LiteralValue::Number(SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis() as f64))},
-        }));
+        env.define_global(
+            "clock",
+            LiteralValue::Callable(AmystCallable::Native {
+                arity: 0,
+                name: "clock",
+                func: |_args| {
+                    Ok(LiteralValue::Number(
+                        SystemTime::now()
+                            .duration_since(UNIX_EPOCH)
+                            .unwrap()
+                            .as_millis() as f64,
+                    ))
+                },
+            }),
+        );
 
-        Self {
-            env
-        }
+        Self { env }
     }
 
     pub(crate) fn interpret(
@@ -37,7 +45,7 @@ impl<'a> Interpreter<'a> {
         let env = &mut self.env;
         match ast.get_stmt(stmt_id) {
             Stmt::Print(id) => {
-                let val = evaluate(ast,self, *id)?;
+                let val = evaluate(ast, self, *id)?;
                 println!("{}", self.stringify(val))
             }
             Stmt::Expression(id) => {
@@ -48,7 +56,14 @@ impl<'a> Interpreter<'a> {
                     let val = evaluate(ast, self, *id)?;
                     self.env.define(name.lexeme, val)
                 } else {
-                    self.env.define(name.lexeme, LiteralValue::Nil)
+                    return Err(AmystError::Runtime {
+                        message: report_error(
+                            name.line,
+                            Some(&format!(" at '{}'", name.lexeme)),
+                            "Variable should have an initial value.",
+                        ),
+                    });
+                    self.env.define(name.lexeme, LiteralValue::Unit)
                 }
             }
             Stmt::Block(stmts) => {
@@ -109,14 +124,20 @@ impl<'a> Interpreter<'a> {
                     }
                 }
             }
-            Stmt::Function {name,params,body, return_type} => {
-                env.define(name.lexeme,LiteralValue::Callable(AmystCallable::UserDefined {
+            Stmt::Function {
+                name,
+                params,
+                body,
+                return_type,
+            } => env.define(
+                name.lexeme,
+                LiteralValue::Callable(AmystCallable::UserDefined {
                     name: (*name).clone(),
                     params: (*params).clone(),
                     body: *body,
-                    return_type: (*return_type).clone()
-                }))
-            }
+                    return_type: (*return_type).clone(),
+                }),
+            ),
         }
         Ok(())
     }
@@ -137,7 +158,7 @@ impl<'a> Interpreter<'a> {
                     format!("{start}..{end}")
                 }
             }
-            LiteralValue::Nil => String::from("nil"),
+            LiteralValue::Unit => String::from("()"),
             LiteralValue::Callable(func) => match func {
                 AmystCallable::Native { name, .. } => format!("<native fn {name}>"),
                 AmystCallable::UserDefined { name, .. } => format!("<fn {}>", name.lexeme),

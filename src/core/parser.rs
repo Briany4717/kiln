@@ -1,8 +1,8 @@
-use crate::core::expr::{Stmt, StmtId, AST, LiteralValue, ExprId, ExprKind};
+use crate::core::callable::{AmystType, Param};
+use crate::core::expr::{AST, ExprId, ExprKind, LiteralValue, Stmt, StmtId};
 use crate::core::scanner::{Token, TokenType};
 use crate::{AmystError, report_error};
 use std::borrow::Cow;
-use crate::core::callable::{AmystType, Param};
 
 pub struct Parser<'a> {
     tokens: &'a [Token<'a>],
@@ -42,14 +42,13 @@ impl<'a> Parser<'a> {
     }
 
     fn declaration(&mut self, ast: &mut AST<'a>) -> Result<Stmt<'a>, AmystError> {
-        if self.matches(&[TokenType::Fn]){
-            self.function(ast,"function")
+        if self.matches(&[TokenType::Fn]) {
+            self.function(ast, "function")
         } else if self.matches(&[TokenType::Let]) {
             self.var_declaration(ast)
         } else {
             self.statement(ast)
         }
-
     }
 
     fn statement(&mut self, ast: &mut AST<'a>) -> Result<Stmt<'a>, AmystError> {
@@ -133,40 +132,73 @@ impl<'a> Parser<'a> {
     }
 
     fn function(&mut self, ast: &mut AST<'a>, kind: &'a str) -> Result<Stmt<'a>, AmystError> {
-        let name = self.consume_identifier(&format!("Expect {} name.",kind))?;
-        self.consume(TokenType::LeftParen, &format!("Expect '(' after {} name.",kind))?;
+        let name = self.consume_identifier(&format!("Expect {} name.", kind))?;
+        self.consume(
+            TokenType::LeftParen,
+            &format!("Expect '(' after {} name.", kind),
+        )?;
         let mut params = Vec::new();
         if !self.check(&TokenType::RightParen) {
-            let is_mut = if self.matches(&[TokenType::Mut]){ true } else { false };
+            let is_mut = if self.matches(&[TokenType::Mut]) {
+                true
+            } else {
+                false
+            };
 
             let name = self.consume_identifier("Expect parameter name.")?;
 
-            let type_annotation= if self.matches(&[TokenType::Colon]){
+            let type_annotation = if self.matches(&[TokenType::Colon]) {
                 Some(self.parse_type("Expected parameter type identifier.")?)
-            } else { None };
+            } else {
+                None
+            };
 
-            params.push(Param { name , is_mut, type_annotation});
+            params.push(Param {
+                name,
+                is_mut,
+                type_annotation,
+            });
             while self.matches(&[TokenType::Comma]) {
-                let is_mut = if self.matches(&[TokenType::Mut]){ true } else { false };
+                let is_mut = if self.matches(&[TokenType::Mut]) {
+                    true
+                } else {
+                    false
+                };
 
                 let name = self.consume_identifier("Expect parameter name.")?;
 
-                let type_annotation= if self.matches(&[TokenType::Colon]){
+                let type_annotation = if self.matches(&[TokenType::Colon]) {
                     Some(self.parse_type("Expected parameter type identifier.")?)
-                } else { None };
-                params.push(Param { name , is_mut, type_annotation});
+                } else {
+                    None
+                };
+                params.push(Param {
+                    name,
+                    is_mut,
+                    type_annotation,
+                });
             }
         }
         self.consume(TokenType::RightParen, "Expect ')' after parameters.")?;
         let return_type = if self.check(&TokenType::Arrow) {
             self.advance();
             Some(self.parse_type("Expected return type.")?)
-        } else { None };
+        } else {
+            None
+        };
 
-        self.consume(TokenType::LeftBrace, &format!("Expect '{{' before {} body.",kind))?;
+        self.consume(
+            TokenType::LeftBrace,
+            &format!("Expect '{{' before {} body.", kind),
+        )?;
         let body_stmts = self.block(ast)?;
         let body = ast.add_stmt(Stmt::Block(body_stmts));
-        Ok(Stmt::Function {name, params,body,return_type})
+        Ok(Stmt::Function {
+            name,
+            params,
+            body,
+            return_type,
+        })
     }
 
     fn parse_type(&mut self, message: &str) -> Result<AmystType, AmystError> {
@@ -353,13 +385,17 @@ impl<'a> Parser<'a> {
             }
         }
         let paren = self.consume(TokenType::RightParen, "Expect ')' after arguments.")?;
-        Ok(ast.add_node(ExprKind::Call {callee,paren,arguments}))
+        Ok(ast.add_node(ExprKind::Call {
+            callee,
+            paren,
+            arguments,
+        }))
     }
 
     fn call(&mut self, ast: &mut AST<'a>) -> Result<ExprId, AmystError> {
         let mut expr = self.primary(ast)?;
         loop {
-            if self.matches(&[TokenType::LeftParen]){
+            if self.matches(&[TokenType::LeftParen]) {
                 expr = self.finish_call(ast, expr)?;
             } else {
                 break;
@@ -379,7 +415,7 @@ impl<'a> Parser<'a> {
         let expr = match self.advance().token_type {
             TokenType::False => ExprKind::Literal(LiteralValue::Boolean(false)),
             TokenType::True => ExprKind::Literal(LiteralValue::Boolean(true)),
-            TokenType::Nil => ExprKind::Literal(LiteralValue::Nil),
+            TokenType::Unit => ExprKind::Literal(LiteralValue::Unit),
             TokenType::Number(n) => ExprKind::Literal(LiteralValue::Number(n)),
             TokenType::String(s) => ExprKind::Literal(LiteralValue::String(Cow::from(s))),
             TokenType::LeftParen => {
