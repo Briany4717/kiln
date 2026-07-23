@@ -1,4 +1,4 @@
-use crate::KilnError;
+use crate::AmystError;
 use std::fmt::Display;
 use std::str::FromStr;
 
@@ -82,7 +82,7 @@ impl<'a> Scanner<'a> {
         }
     }
 
-    pub fn scan_tokens(mut self) -> Result<Vec<Token<'a>>, KilnError> {
+    pub fn scan_tokens(mut self) -> Result<Vec<Token<'a>>, AmystError> {
         while !self.is_at_end() {
             self.start = self.current;
             self.scan_token()?;
@@ -97,7 +97,7 @@ impl<'a> Scanner<'a> {
         Ok(self.tokens)
     }
 
-    fn scan_token(&mut self) -> Result<(), KilnError> {
+    fn scan_token(&mut self) -> Result<(), AmystError> {
         let c = self.advance();
         match c {
             '(' => Ok(self.add_token(TokenType::LeftParen)),
@@ -175,7 +175,7 @@ impl<'a> Scanner<'a> {
                 } else if c.is_ascii_alphanumeric() {
                     Ok(self.add_identifier())
                 } else {
-                    Err(KilnError::UnexpectedCharacter(self.line))
+                    Err(AmystError::UnexpectedCharacter(self.line))
                 }
             }
         }
@@ -216,7 +216,7 @@ impl<'a> Scanner<'a> {
         self.add_token(token_type);
     }
 
-    fn add_number_token(&mut self) -> Result<(), KilnError> {
+    fn add_number_token(&mut self) -> Result<(), AmystError> {
         while self.peek().is_some() && self.peek().unwrap().is_digit(10) {
             self.advance();
         }
@@ -229,10 +229,10 @@ impl<'a> Scanner<'a> {
         }
         match f64::from_str(&self.source[self.start..self.current]) {
             Ok(n) => Ok(self.add_token(TokenType::Number(n))),
-            Err(_) => Err(KilnError::InvalidNumberFormat),
+            Err(_) => Err(AmystError::InvalidNumberFormat),
         }
     }
-    fn add_string_token(&mut self) -> Result<(), KilnError> {
+    fn add_string_token(&mut self) -> Result<(), AmystError> {
         while self.peek() != Some('"') && !self.is_at_end() {
             if self.peek() == Some('\n') {
                 self.line += 1;
@@ -241,7 +241,7 @@ impl<'a> Scanner<'a> {
         }
 
         if self.is_at_end() {
-            return Err(KilnError::UnterminatedString);
+            return Err(AmystError::UnterminatedString);
         }
 
         self.advance();

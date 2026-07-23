@@ -1,5 +1,5 @@
 use std::time::{SystemTime, UNIX_EPOCH};
-use crate::KilnError;
+use crate::AmystError;
 use crate::core::env::ScopeStack;
 use crate::core::expr::{LiteralValue, Stmt, StmtId, evaluate, AST};
 use crate::core::kiln_callable::KilnCallable;
@@ -26,14 +26,14 @@ impl<'a> Interpreter<'a> {
         &mut self,
         ast: &AST<'a>,
         statements: &[StmtId],
-    ) -> Result<(), KilnError> {
+    ) -> Result<(), AmystError> {
         for stmt_id in statements {
             self.execute(ast, *stmt_id)?;
         }
         Ok(())
     }
 
-    pub(crate) fn execute(&mut self, ast: &AST<'a>, stmt_id: StmtId) -> Result<(), KilnError> {
+    pub(crate) fn execute(&mut self, ast: &AST<'a>, stmt_id: StmtId) -> Result<(), AmystError> {
         let env = &mut self.env;
         match ast.get_stmt(stmt_id) {
             Stmt::Print(id) => {
@@ -103,7 +103,7 @@ impl<'a> Interpreter<'a> {
                         }
                     }
                     _ => {
-                        return Err(KilnError::Runtime {
+                        return Err(AmystError::Runtime {
                             message: "Expected an iterable object.".to_string(),
                         });
                     }
@@ -145,12 +145,12 @@ impl<'a> Interpreter<'a> {
     }
 }
 
-pub(crate) fn is_truthy(val: &LiteralValue) -> Result<bool, KilnError> {
+pub(crate) fn is_truthy(val: &LiteralValue) -> Result<bool, AmystError> {
     match val {
         LiteralValue::Boolean(b) => Ok(*b),
         _ => {
             let message = String::from("Expected boolean expression");
-            Err(KilnError::Runtime { message })
+            Err(AmystError::Runtime { message })
         }
     }
 }

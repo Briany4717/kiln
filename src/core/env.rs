@@ -1,6 +1,6 @@
 use crate::core::expr::LiteralValue;
 use crate::core::scanner::Token;
-use crate::{KilnError, report_error};
+use crate::{AmystError, report_error};
 use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
@@ -37,14 +37,14 @@ impl<'a> ScopeStack<'a> {
         }
     }
 
-    pub(crate) fn get(&self, name: &Token<'a>) -> Result<LiteralValue<'a>, KilnError> {
+    pub(crate) fn get(&self, name: &Token<'a>) -> Result<LiteralValue<'a>, AmystError> {
         for scope in self.scopes.iter().rev() {
             if let Some(val) = scope.get(name.lexeme) {
                 return Ok(val.clone());
             }
         }
 
-        Err(KilnError::Runtime {
+        Err(AmystError::Runtime {
             message: report_error(
                 name.line,
                 Some(&format!(" at '{}'", name.lexeme)),
@@ -57,7 +57,7 @@ impl<'a> ScopeStack<'a> {
         &mut self,
         tk: &Token<'a>,
         val: LiteralValue<'a>,
-    ) -> Result<LiteralValue<'a>, KilnError> {
+    ) -> Result<LiteralValue<'a>, AmystError> {
         let name = tk.lexeme;
 
         for scope in self.scopes.iter_mut().rev() {
@@ -67,7 +67,7 @@ impl<'a> ScopeStack<'a> {
             }
         }
 
-        Err(KilnError::Runtime {
+        Err(AmystError::Runtime {
             message: report_error(
                 tk.line,
                 Some(&format!(" at '{}'", name)),

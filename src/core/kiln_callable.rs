@@ -2,14 +2,14 @@ use crate::core::env::ScopeStack;
 use crate::core::expr::{LiteralValue, StmtId, AST};
 use crate::core::interpreter::Interpreter;
 use crate::core::scanner::Token;
-use crate::KilnError;
+use crate::AmystError;
 
 #[derive(Clone, PartialEq, Debug)]
 pub(crate) enum KilnCallable<'a> {
     Native {
         arity: usize,
         name: &'a str,
-        func: fn(&[LiteralValue<'a>]) -> Result<LiteralValue<'a>, KilnError>,
+        func: fn(&[LiteralValue<'a>]) -> Result<LiteralValue<'a>, AmystError>,
     },
     UserDefined {
         name: Token<'a>,
@@ -19,7 +19,7 @@ pub(crate) enum KilnCallable<'a> {
 }
 
 impl<'a> KilnCallable<'a> {
-    pub(crate) fn call(&self, args: &[LiteralValue<'a>], interpreter: &mut Interpreter<'a>, ast: &AST<'a>) -> Result<LiteralValue<'a>, KilnError>{
+    pub(crate) fn call(&self, args: &[LiteralValue<'a>], interpreter: &mut Interpreter<'a>, ast: &AST<'a>) -> Result<LiteralValue<'a>, AmystError>{
         match self {
             KilnCallable::Native {func, ..} => {
                 func(args)

@@ -1,20 +1,21 @@
-# ◎ Kiln
+# ⟡ Amyst
 
 > Un lenguaje de programación de propósito general, forjado en Rust.
 
-Kiln es un lenguaje de programación construido desde cero siguiendo el libro
+Amyst es un lenguaje de programación construido desde cero siguiendo el libro
 [*Crafting Interpreters*](https://craftinginterpreters.com/) de Robert Nystrom, implementado en Rust.
 
 Este proyecto es tanto un ejercicio de aprendizaje sobre diseño de lenguajes e implementación de intérpretes,
-como la base de un lenguaje que busca ser rápido, simple y agradable de usar.
+como la base de un lenguaje que busca ser rápido, tan simple como el usuario desee y agradable de usar.
 
 ## Estado del proyecto
 
-**En desarrollo activo.** Kiln todavía está en una etapa temprana de desarrollo y diseño. La sintaxis y las funcionalidades pueden cambiar sin previo aviso.
+**En desarrollo activo.** Amyst todavía está tomando forma — la sintaxis y las funcionalidades pueden cambiar sin previo aviso.
 
 - [x] Lexer / Scanner
 - [x] Parser (AST)
-- [x] Intérprete tree-walking
+- [x] Evaluador de expresiones
+- [x] Statements y variables
 - [x] Resolución de variables y scopes
 - [ ] Clases y herencia
 - [ ] Compilador a bytecode
@@ -22,32 +23,36 @@ como la base de un lenguaje que busca ser rápido, simple y agradable de usar.
 - [ ] Garbage collector
 - [ ] Librería estándar básica
 
-## ¿Por qué Kiln?
+## ¿Por qué Amyst?
 
-Un horno de alfarero (*kiln*) toma algo maleable y, con calor y tiempo, lo convierte en algo sólido y duradero.
-Ese es el espíritu del proyecto: partir de un diseño simple e ir cociendo el lenguaje hasta que tome forma final.
+Mi abuela me regaló alguna vez un anillo de amatista y mientras buscaba un buen nombre para el proyecto lo recordé.
+
+La amatista es un cuarzo violeta cuyo nombre viene del griego *amethystos*, que significa literalmente
+**"no ebrio"**: los antiguos griegos creían que la piedra protegía contra la embriaguez y traía claridad mental.
+Es una buena metáfora para un lenguaje que aspira a ser claro, directo y sin ruido innecesario —
+tanto en su sintaxis como en cómo se siente escribir en él.
 
 ## Instalación
 
 ```bash
-git clone https://github.com/Briany4717/kiln.git
-cd kiln
+git clone https://github.com/Briany4717/amyst.git
+cd amyst
 cargo build --release
 ```
 
 ## Uso
 
 ```bash
-# Ejecutar un script .kiln
-./target/release/kiln script.kiln
+# Ejecutar un script .amy
+./target/release/amyst run script.amy
 
 # Abrir el REPL
-./target/release/kiln
+./target/release/amyst
 ```
 
 ## Ejemplo
 
-```kiln
+```amyst
 fn fib(n) {
     if (n < 2) return n;
     return fib(n - 1) + fib(n - 2);
@@ -56,15 +61,14 @@ fn fib(n) {
 print fib(10);
 ```
 
-> Nota: la sintaxis final de Kiln aún está en definición y puede diferir de este ejemplo.
-
+> Nota: la sintaxis final de Amyst aún está en definición y puede diferir de este ejemplo.
 
 ## Roadmap
 
 Este proyecto sigue las dos partes del libro *Crafting Interpreters*:
 
-1. **`jlox` → `kiln-tree`**: intérprete tree-walking (fase actual)
-2. **`clox` → `kiln-vm`**: compilador a bytecode + máquina virtual, orientado a rendimiento
+1. **`jlox` → `amyst-tree`**: intérprete tree-walking (fase actual)
+2. **`clox` → `amyst-vm`**: compilador a bytecode + máquina virtual, orientado a rendimiento
 
 ## Contribuir
 

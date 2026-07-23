@@ -1,4 +1,4 @@
-use crate::{report_error, KilnError};
+use crate::{report_error, AmystError};
 use crate::core::env::ScopeStack;
 use crate::core::interpreter::{is_truthy, Interpreter};
 use crate::core::parser::ensure_int;
@@ -126,7 +126,7 @@ pub(crate) fn evaluate<'a>(
     ast: &AST<'a>,
     interpreter: &mut Interpreter<'a>,
     id: ExprId,
-) -> Result<LiteralValue<'a>, KilnError> {
+) -> Result<LiteralValue<'a>, AmystError> {
     let node = ast.get_node(id);
 
     match node {
@@ -137,13 +137,13 @@ pub(crate) fn evaluate<'a>(
             match &operator.token_type {
                 TokenType::Minus => match right_val {
                     LiteralValue::Number(n) => Ok(LiteralValue::Number(-n)),
-                    _ => Err(KilnError::Runtime {
+                    _ => Err(AmystError::Runtime {
                         message: format!("Invalid - operand for {:?} literal", right_val),
                     }),
                 },
                 TokenType::Bang => match right_val {
                     LiteralValue::Boolean(b) => Ok(LiteralValue::Boolean(!b)),
-                    _ => Err(KilnError::Runtime {
+                    _ => Err(AmystError::Runtime {
                         message: format!("Invalid ! operand for {:?} literal", right_val),
                     }),
                 },
@@ -173,7 +173,7 @@ pub(crate) fn evaluate<'a>(
                     _ => {
                         let message =
                             format!("Invalid {:?} token for number binary operation", operation);
-                        Err(KilnError::Runtime { message })
+                        Err(AmystError::Runtime { message })
                     }
                 },
                 (LiteralValue::String(s), LiteralValue::String(t)) => match operation {
@@ -184,12 +184,12 @@ pub(crate) fn evaluate<'a>(
                     _ => {
                         let message =
                             format!("Invalid {:?} token for string binary operation", operation);
-                        Err(KilnError::Runtime { message })
+                        Err(AmystError::Runtime { message })
                     }
                 },
                 _ => {
                     let message = "Incompatible operand types".to_string();
-                    Err(KilnError::Runtime { message })
+                    Err(AmystError::Runtime { message })
                 }
             }
         }
@@ -237,7 +237,7 @@ pub(crate) fn evaluate<'a>(
                         inclusive: *inclusive,
                     })
                 }
-                _ => Err(KilnError::Runtime {
+                _ => Err(AmystError::Runtime {
                     message: "Range operands must be numbers.".to_string(),
                 }),
             }
@@ -252,7 +252,7 @@ pub(crate) fn evaluate<'a>(
             let function = match callee_val {
                 LiteralValue::Callable(func) => func,
                 _ => {
-                    return Err(KilnError::Runtime {
+                    return Err(AmystError::Runtime {
                         message: report_error(
                             paren.line,
                             Some(&format!(" at '{}'", paren.lexeme)),
@@ -263,7 +263,7 @@ pub(crate) fn evaluate<'a>(
             };
 
             if arguments.len() != function.arity() {
-                return Err(KilnError::Runtime {
+                return Err(AmystError::Runtime {
                     message: report_error(
                         paren.line,
                         Some(&format!(" at '{}'", paren.lexeme)),
@@ -337,7 +337,7 @@ pub fn format_ast(ast: &AST, id: ExprId) -> String {
 
 #[cfg(test)]
 mod test {
-    use crate::KilnError;
+    use crate::AmystError;
     use crate::core::env::ScopeStack;
     use crate::core::expr::{AST, ExprKind, LiteralValue, evaluate};
     use crate::core::scanner::{Token, TokenType};
@@ -345,7 +345,7 @@ mod test {
     use crate::core::interpreter::Interpreter;
 
     #[test]
-    fn literal_value_expression_has_expected_result() -> Result<(), KilnError> {
+    fn literal_value_expression_has_expected_result() -> Result<(), AmystError> {
         let mut ast = AST::new();
         let id = ast.add_node(ExprKind::Literal(LiteralValue::Number(32.0)));
         let id_ev = ast.add_node(ExprKind::Grouping(id));
@@ -355,7 +355,7 @@ mod test {
     }
 
     #[test]
-    fn unitary_expression_evaluation_has_expected_result() -> Result<(), KilnError> {
+    fn unitary_expression_evaluation_has_expected_result() -> Result<(), AmystError> {
         let mut ast = AST::new();
         let right = ast.add_node(ExprKind::Literal(LiteralValue::Number(32.0)));
         let id = ast.add_node(ExprKind::Unary {
@@ -382,7 +382,7 @@ mod test {
     }
 
     #[test]
-    fn unitary_evaluation_errors_are_displayed() -> Result<(), KilnError> {
+    fn unitary_evaluation_errors_are_displayed() -> Result<(), AmystError> {
         let mut ast = AST::new();
         let mut env = Interpreter::new();
         let right = ast.add_node(ExprKind::Literal(LiteralValue::Number(32.0)));
@@ -396,7 +396,7 @@ mod test {
         });
         assert_eq!(
             evaluate(&ast, &mut env, id).err(),
-            Some(KilnError::Runtime {
+            Some(AmystError::Runtime {
                 message: format!(
                     "Invalid ! operand for {:?} literal",
                     LiteralValue::Number(32.0)
@@ -414,7 +414,7 @@ mod test {
         });
         assert_eq!(
             evaluate(&ast, &mut env, id).err(),
-            Some(KilnError::Runtime {
+            Some(AmystError::Runtime {
                 message: format!(
                     "Invalid - operand for {:?} literal",
                     LiteralValue::Boolean(false)
@@ -425,7 +425,7 @@ mod test {
     }
 
     #[test]
-    fn binary_expression_evaluation_has_expected_result() -> Result<(), KilnError> {
+    fn binary_expression_evaluation_has_expected_result() -> Result<(), AmystError> {
         let mut ast = AST::new();
         let mut env = Interpreter::new();
         let operations = vec![

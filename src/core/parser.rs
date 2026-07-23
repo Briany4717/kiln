@@ -1,6 +1,6 @@
 use crate::core::expr::{Stmt, StmtId, AST, LiteralValue, ExprId, ExprKind};
 use crate::core::scanner::{Token, TokenType};
-use crate::{KilnError, report_error};
+use crate::{AmystError, report_error};
 use std::borrow::Cow;
 
 pub struct Parser<'a> {
@@ -13,7 +13,7 @@ impl<'a> Parser<'a> {
         Self { tokens, current: 0 }
     }
 
-    pub(crate) fn parse(&mut self, ast: &mut AST<'a>) -> Result<Vec<StmtId>, KilnError> {
+    pub(crate) fn parse(&mut self, ast: &mut AST<'a>) -> Result<Vec<StmtId>, AmystError> {
         let mut root_stmt = Vec::new();
         let mut errors = Vec::new();
         while !self.is_at_end() {
@@ -32,15 +32,15 @@ impl<'a> Parser<'a> {
         if errors.is_empty() {
             Ok(root_stmt)
         } else {
-            Err(KilnError::Multiple(errors))
+            Err(AmystError::Multiple(errors))
         }
     }
 
-    fn expression(&mut self, ast: &mut AST<'a>) -> Result<ExprId, KilnError> {
+    fn expression(&mut self, ast: &mut AST<'a>) -> Result<ExprId, AmystError> {
         self.assignment(ast)
     }
 
-    fn declaration(&mut self, ast: &mut AST<'a>) -> Result<Stmt<'a>, KilnError> {
+    fn declaration(&mut self, ast: &mut AST<'a>) -> Result<Stmt<'a>, AmystError> {
         if self.matches(&[TokenType::Fn]){
             self.function(ast,"function")
         } else if self.matches(&[TokenType::Let]) {
@@ -51,7 +51,7 @@ impl<'a> Parser<'a> {
 
     }
 
-    fn statement(&mut self, ast: &mut AST<'a>) -> Result<Stmt<'a>, KilnError> {
+    fn statement(&mut self, ast: &mut AST<'a>) -> Result<Stmt<'a>, AmystError> {
         if self.matches(&[TokenType::For]) {
             self.for_stmt(ast)
         } else if self.matches(&[TokenType::If]) {
@@ -67,7 +67,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn for_stmt(&mut self, ast: &mut AST<'a>) -> Result<Stmt<'a>, KilnError> {
+    fn for_stmt(&mut self, ast: &mut AST<'a>) -> Result<Stmt<'a>, AmystError> {
         let variable = self.consume_identifier("Expected an identifier.")?;
         self.consume(TokenType::In, "Expected 'in'.")?;
 
@@ -81,7 +81,7 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn if_stmt(&mut self, ast: &mut AST<'a>) -> Result<Stmt<'a>, KilnError> {
+    fn if_stmt(&mut self, ast: &mut AST<'a>) -> Result<Stmt<'a>, AmystError> {
         let condition = self.expression(ast)?;
         let stmt = self.statement(ast)?;
         let then_branch = ast.add_stmt(stmt);
@@ -98,13 +98,13 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn print_stmt(&mut self, ast: &mut AST<'a>) -> Result<Stmt<'a>, KilnError> {
+    fn print_stmt(&mut self, ast: &mut AST<'a>) -> Result<Stmt<'a>, AmystError> {
         let val = self.expression(ast)?;
         self.consume(TokenType::Semicolon, "Expect ';' after value.")?;
         Ok(Stmt::Print(val))
     }
 
-    fn var_declaration(&mut self, ast: &mut AST<'a>) -> Result<Stmt<'a>, KilnError> {
+    fn var_declaration(&mut self, ast: &mut AST<'a>) -> Result<Stmt<'a>, AmystError> {
         let name = self.consume_identifier("Expect variable name.")?;
         let mut initializer = None;
         if self.matches(&[TokenType::Equal]) {
@@ -118,20 +118,20 @@ impl<'a> Parser<'a> {
         Ok(Stmt::Var { name, initializer })
     }
 
-    fn while_stmt(&mut self, ast: &mut AST<'a>) -> Result<Stmt<'a>, KilnError> {
+    fn while_stmt(&mut self, ast: &mut AST<'a>) -> Result<Stmt<'a>, AmystError> {
         let condition = self.expression(ast)?;
         let body_stmt = self.statement(ast)?;
         let body = ast.add_stmt(body_stmt);
         Ok(Stmt::While { condition, body })
     }
 
-    fn expression_stmt(&mut self, ast: &mut AST<'a>) -> Result<Stmt<'a>, KilnError> {
+    fn expression_stmt(&mut self, ast: &mut AST<'a>) -> Result<Stmt<'a>, AmystError> {
         let val = self.expression(ast)?;
         self.consume(TokenType::Semicolon, "Expect ';' after expression.")?;
         Ok(Stmt::Expression(val))
     }
 
-    fn function(&mut self, ast: &mut AST<'a>, kind: &'a str) -> Result<Stmt<'a>, KilnError> {
+    fn function(&mut self, ast: &mut AST<'a>, kind: &'a str) -> Result<Stmt<'a>, AmystError> {
         let name = self.consume_identifier(&format!("Expect {} name.",kind))?;
         self.consume(TokenType::LeftParen, &format!("Expect '(' after {} name.",kind))?;
         let mut params = Vec::new();
@@ -148,7 +148,7 @@ impl<'a> Parser<'a> {
         Ok(Stmt::Function {name, params,body})
     }
 
-    fn block(&mut self, ast: &mut AST<'a>) -> Result<Vec<StmtId>, KilnError> {
+    fn block(&mut self, ast: &mut AST<'a>) -> Result<Vec<StmtId>, AmystError> {
         let mut stmts = Vec::new();
         while !self.check(&TokenType::RightBrace) && !self.is_at_end() {
             let stmt = self.declaration(ast)?;
@@ -158,7 +158,7 @@ impl<'a> Parser<'a> {
         Ok(stmts)
     }
 
-    fn assignment(&mut self, ast: &mut AST<'a>) -> Result<ExprId, KilnError> {
+    fn assignment(&mut self, ast: &mut AST<'a>) -> Result<ExprId, AmystError> {
         let expr = self.range(ast)?;
 
         if self.matches(&[TokenType::Equal]) {
@@ -170,7 +170,7 @@ impl<'a> Parser<'a> {
                     name: tk.clone(),
                     value,
                 })),
-                _ => Err(KilnError::Runtime {
+                _ => Err(AmystError::Runtime {
                     message: "Invalid assignment target.".to_string(),
                 }),
             };
@@ -178,7 +178,7 @@ impl<'a> Parser<'a> {
         Ok(expr)
     }
 
-    fn range(&mut self, ast: &mut AST<'a>) -> Result<ExprId, KilnError> {
+    fn range(&mut self, ast: &mut AST<'a>) -> Result<ExprId, AmystError> {
         let mut expr = self.or(ast)?;
 
         if self.matches(&[TokenType::DotDot, TokenType::DotDotEqual]) {
@@ -195,7 +195,7 @@ impl<'a> Parser<'a> {
         Ok(expr)
     }
 
-    fn or(&mut self, ast: &mut AST<'a>) -> Result<ExprId, KilnError> {
+    fn or(&mut self, ast: &mut AST<'a>) -> Result<ExprId, AmystError> {
         let mut expr = self.and(ast)?;
 
         while self.matches(&[TokenType::Or]) {
@@ -211,7 +211,7 @@ impl<'a> Parser<'a> {
         Ok(expr)
     }
 
-    fn and(&mut self, ast: &mut AST<'a>) -> Result<ExprId, KilnError> {
+    fn and(&mut self, ast: &mut AST<'a>) -> Result<ExprId, AmystError> {
         let mut expr = self.equality(ast)?;
 
         while self.matches(&[TokenType::And]) {
@@ -227,7 +227,7 @@ impl<'a> Parser<'a> {
         Ok(expr)
     }
 
-    fn equality(&mut self, ast: &mut AST<'a>) -> Result<ExprId, KilnError> {
+    fn equality(&mut self, ast: &mut AST<'a>) -> Result<ExprId, AmystError> {
         let mut expr = self.comparison(ast)?;
         while self.matches(&[TokenType::BangEqual, TokenType::EqualEqual]) {
             let operator = self.previous();
@@ -241,7 +241,7 @@ impl<'a> Parser<'a> {
         Ok(expr)
     }
 
-    fn comparison(&mut self, ast: &mut AST<'a>) -> Result<ExprId, KilnError> {
+    fn comparison(&mut self, ast: &mut AST<'a>) -> Result<ExprId, AmystError> {
         let mut expr = self.term(ast)?;
 
         while self.matches(&[
@@ -262,7 +262,7 @@ impl<'a> Parser<'a> {
         Ok(expr)
     }
 
-    fn term(&mut self, ast: &mut AST<'a>) -> Result<ExprId, KilnError> {
+    fn term(&mut self, ast: &mut AST<'a>) -> Result<ExprId, AmystError> {
         let mut expr = self.factor(ast)?;
 
         while self.matches(&[TokenType::Minus, TokenType::Plus]) {
@@ -278,7 +278,7 @@ impl<'a> Parser<'a> {
         Ok(expr)
     }
 
-    fn factor(&mut self, ast: &mut AST<'a>) -> Result<ExprId, KilnError> {
+    fn factor(&mut self, ast: &mut AST<'a>) -> Result<ExprId, AmystError> {
         let mut expr = self.unary(ast)?;
 
         while self.matches(&[TokenType::Slash, TokenType::Star]) {
@@ -294,7 +294,7 @@ impl<'a> Parser<'a> {
         Ok(expr)
     }
 
-    fn unary(&mut self, ast: &mut AST<'a>) -> Result<ExprId, KilnError> {
+    fn unary(&mut self, ast: &mut AST<'a>) -> Result<ExprId, AmystError> {
         if self.matches(&[TokenType::Bang, TokenType::Minus]) {
             let operator = self.previous();
             let right = self.unary(ast)?;
@@ -304,7 +304,7 @@ impl<'a> Parser<'a> {
         self.call(ast)
     }
 
-    fn finish_call(&mut self, ast: &mut AST<'a>, callee: ExprId) -> Result<ExprId,KilnError> {
+    fn finish_call(&mut self, ast: &mut AST<'a>, callee: ExprId) -> Result<ExprId, AmystError> {
         let mut arguments = Vec::new();
         if !self.check(&TokenType::RightParen) {
             arguments.push(self.expression(ast)?);
@@ -317,7 +317,7 @@ impl<'a> Parser<'a> {
         Ok(ast.add_node(ExprKind::Call {callee,paren,arguments}))
     }
 
-    fn call(&mut self, ast: &mut AST<'a>) -> Result<ExprId, KilnError> {
+    fn call(&mut self, ast: &mut AST<'a>) -> Result<ExprId, AmystError> {
         let mut expr = self.primary(ast)?;
         loop {
             if self.matches(&[TokenType::LeftParen]){
@@ -330,9 +330,9 @@ impl<'a> Parser<'a> {
         Ok(expr)
     }
 
-    fn primary(&mut self, ast: &mut AST<'a>) -> Result<ExprId, KilnError> {
+    fn primary(&mut self, ast: &mut AST<'a>) -> Result<ExprId, AmystError> {
         if self.is_at_end() {
-            return Err(KilnError::Runtime {
+            return Err(AmystError::Runtime {
                 message: "Invalid token".to_string(),
             });
         }
@@ -350,7 +350,7 @@ impl<'a> Parser<'a> {
             }
             TokenType::Identifier(_) => ExprKind::Variable(self.previous()),
             _ => {
-                return Err(KilnError::Runtime {
+                return Err(AmystError::Runtime {
                     message: "Expect expression.".to_string(),
                 });
             }
@@ -373,16 +373,16 @@ impl<'a> Parser<'a> {
         &mut self,
         token_type: TokenType<'a>,
         message: &str,
-    ) -> Result<Token<'a>, KilnError> {
+    ) -> Result<Token<'a>, AmystError> {
         let tok = token_type.clone();
         if self.check(&token_type) {
             return Ok(self.advance());
         }
         match tok {
-            TokenType::Eof => Err(KilnError::Runtime {
+            TokenType::Eof => Err(AmystError::Runtime {
                 message: report_error(self.peek().line, Some(" at end"), message),
             }),
-            _ => Err(KilnError::Runtime {
+            _ => Err(AmystError::Runtime {
                 message: report_error(
                     self.peek().line,
                     Some(&format!(" at '{}'", self.peek().lexeme)),
@@ -392,11 +392,11 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn consume_identifier(&mut self, message: &str) -> Result<Token<'a>, KilnError> {
+    fn consume_identifier(&mut self, message: &str) -> Result<Token<'a>, AmystError> {
         if matches!(self.peek().token_type, TokenType::Identifier(_)) {
             Ok(self.advance())
         } else {
-            Err(KilnError::Runtime {
+            Err(AmystError::Runtime {
                 message: report_error(
                     self.peek().line,
                     Some(&format!(" at '{}'", self.peek().lexeme)),
@@ -458,15 +458,15 @@ impl<'a> Parser<'a> {
     }
 }
 
-pub(crate) fn ensure_int(val: f64) -> Result<i32, KilnError> {
+pub(crate) fn ensure_int(val: f64) -> Result<i32, AmystError> {
     if val.fract() != 0.0 {
         let message = String::from("Float has a fractional component and is not a whole integer");
-        return Err(KilnError::Runtime { message });
+        return Err(AmystError::Runtime { message });
     }
 
     if val < i32::MIN as f64 || val > i32::MAX as f64 || val.is_nan() {
         let message = String::from("Float is out of bounds for an i32 integer");
-        return Err(KilnError::Runtime { message });
+        return Err(AmystError::Runtime { message });
     }
 
     Ok(val as i32)
@@ -474,13 +474,13 @@ pub(crate) fn ensure_int(val: f64) -> Result<i32, KilnError> {
 
 #[cfg(test)]
 mod test {
-    use crate::KilnError;
+    use crate::AmystError;
     use crate::core::Scanner;
     use crate::core::expr::{AST, format_ast};
     use crate::core::parser::Parser;
 
     #[test]
-    fn parsing_test() -> Result<(), KilnError> {
+    fn parsing_test() -> Result<(), AmystError> {
         let mut ast = AST::new();
         let scanner = Scanner::new("1 + 2 * 3");
         let tokens = scanner.scan_tokens()?;
