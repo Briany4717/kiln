@@ -1,6 +1,6 @@
 use crate::AmystError;
 use crate::core::env::ScopeStack;
-use crate::core::expr::{AST, LiteralValue, StmtId};
+use crate::core::expr::{AST, ExprId, LiteralValue, StmtId, evaluate};
 use crate::core::interpreter::Interpreter;
 use crate::core::scanner::Token;
 
@@ -32,7 +32,7 @@ pub(crate) enum AmystCallable<'a> {
     UserDefined {
         name: Token<'a>,
         params: Vec<Param<'a>>,
-        body: StmtId,
+        body: ExprId,
         return_type: Option<AmystType>,
     },
 }
@@ -53,10 +53,10 @@ impl<'a> AmystCallable<'a> {
                         .env
                         .define(params[i].name.lexeme, args[i].clone())
                 }
-                let res = interpreter.execute(ast, *body);
+                let res = evaluate(ast, interpreter, *body);
                 interpreter.env.pop_scope();
                 match res {
-                    Ok(()) => Ok(LiteralValue::Unit),
+                    Ok(val) => Ok(val),
                     Err(AmystError::Return(val)) => Ok(val),
                     Err(err) => Err(err),
                 }

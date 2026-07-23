@@ -66,24 +66,6 @@ impl<'a> Interpreter<'a> {
                     self.env.define(name.lexeme, LiteralValue::Unit)
                 }
             }
-            Stmt::Block(stmts) => {
-                env.push_scope();
-                for stmt in stmts {
-                    self.execute(ast, *stmt)?;
-                }
-                self.env.pop_scope()
-            }
-            Stmt::If {
-                condition,
-                then_branch,
-                else_branch,
-            } => {
-                if is_truthy(&evaluate(ast, self, *condition)?)? {
-                    self.execute(ast, *then_branch)?;
-                } else if let Some(else_branch) = else_branch {
-                    self.execute(ast, *else_branch)?;
-                }
-            }
             Stmt::While { condition, body } => {
                 while is_truthy(&evaluate(ast, self, *condition)?)? {
                     self.execute(ast, *body)?;
@@ -141,6 +123,12 @@ impl<'a> Interpreter<'a> {
             Stmt::Return { value, .. } => {
                 let val = evaluate(ast, self, *value)?;
                 return Err(AmystError::Return(val));
+            }
+            Stmt::Block(id) => {
+                evaluate(ast, self, *id)?;
+            }
+            Stmt::If(id) => {
+                evaluate(ast, self, *id)?;
             }
         }
         Ok(())

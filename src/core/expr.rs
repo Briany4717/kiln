@@ -56,22 +56,27 @@ pub enum ExprKind<'a> {
     Grouping(ExprId),
     Literal(LiteralValue<'a>),
     Variable(Token<'a>),
+    Block {
+        stmts: Vec<StmtId>,
+        expr: Option<ExprId>,
+    },
+    If {
+        condition: ExprId,
+        then_branch: ExprId,
+        else_branch: Option<ExprId>,
+    },
 }
 
 pub enum Stmt<'a> {
-    Block(Vec<StmtId>),
+    Block(ExprId),
     Expression(ExprId),
     Function {
         name: Token<'a>,
         params: Vec<Param<'a>>,
-        body: StmtId,
+        body: ExprId,
         return_type: Option<AmystType>,
     },
-    If {
-        condition: ExprId,
-        then_branch: StmtId,
-        else_branch: Option<StmtId>,
-    },
+    If(ExprId),
     Print(ExprId),
     Return {
         keyword: Token<'a>,
@@ -285,6 +290,40 @@ pub(crate) fn evaluate<'a>(
             }
 
             function.call(&arguments, interpreter, ast)
+        }
+        ExprKind::If {
+            condition,
+            then_branch,
+            else_branch,
+        } => {
+            if is_truthy(&evaluate(ast, interpreter, *condition)?)? {
+                evaluate(ast, interpreter, *then_branch)
+            } else if let Some(else_branch) = else_branch {
+                evaluate(ast, interpreter, *else_branch)
+            } else {
+                // Design TODO: if assign statements return value where no else clause
+                Ok(LiteralValue::Unit)
+            }
+        }
+        ExprKind::Block { stmts, expr } => {
+            interpreter.env.push_scope();
+
+            let mut eval_block = || {
+                for stmt_id in stmts {
+                    interpreter.execute(ast, *stmt_id)?;
+                }
+
+                if let Some(expr_id) = expr {
+                    evaluate(ast, interpreter, *expr_id)
+                } else {
+                    Ok(LiteralValue::Unit)
+                }
+            };
+
+            let result = eval_block();
+            interpreter.env.pop_scope();
+
+            result
         }
     }
 }
