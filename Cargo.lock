@@ -3,11 +3,16 @@
 version = 4
 
 [[package]]
-name = "amyst"
+name = "amyst-cli"
 version = "0.1.0"
 dependencies = [
+ "amyst-core",
  "clap",
 ]
+
+[[package]]
+name = "amyst-core"
+version = "0.1.0"
 
 [[package]]
 name = "anstream"

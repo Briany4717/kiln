@@ -14,7 +14,7 @@ impl<'a> Parser<'a> {
         Self { tokens, current: 0 }
     }
 
-    pub(crate) fn parse(&mut self, ast: &mut AST<'a>) -> Result<Vec<StmtId>, AmystError<'a>> {
+    pub fn parse(&mut self, ast: &mut AST<'a>) -> Result<Vec<StmtId>, AmystError<'a>> {
         let mut root_stmt = Vec::new();
         let mut errors = Vec::new();
         while !self.is_at_end() {

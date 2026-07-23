@@ -30,7 +30,7 @@ impl<'a> Interpreter<'a> {
         Self { env }
     }
 
-    pub(crate) fn interpret(
+    pub fn interpret(
         &mut self,
         ast: &AST<'a>,
         statements: &[StmtId],

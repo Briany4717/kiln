@@ -1,17 +1,5 @@
-pub mod core;
-
-use crate::core::expr::{AST, LiteralValue};
-use crate::core::interpreter::Interpreter;
-use clap::Parser;
-use core::Scanner;
+use crate::core::expr::LiteralValue;
 use std::fmt::Display;
-
-#[derive(Parser, Debug)]
-#[command(version, about, long_about = None)]
-struct Args {
-    #[arg(help = "Script to run")]
-    script: String,
-}
 
 #[derive(Debug, PartialEq)]
 pub enum AmystError<'a> {
@@ -49,40 +37,7 @@ impl Display for AmystError<'_> {
 
 impl std::error::Error for AmystError<'_> {}
 
-fn main() {
-    let args = Args::parse();
-
-    if args.script.is_empty() {
-        println!("Usage: kiln [script]");
-        return;
-    }
-
-    if let Err(err_message) = run_file(&args.script) {
-        eprintln!("{err_message}");
-        std::process::exit(70);
-    }
-}
-
-fn run_file(file: &str) -> Result<(), String> {
-    let bytes = std::fs::read(file).map_err(|_| "File not found.".to_string())?;
-    let file_text = String::from_utf8(bytes).map_err(|_| "Invalid format file.".to_string())?;
-
-    run(&file_text).map_err(|e| e.to_string())
-}
-
-fn run(file: &str) -> Result<(), AmystError> {
-    let scanner = Scanner::new(file);
-    let tokens = scanner.scan_tokens()?;
-    let mut parser = crate::core::Parser::new(tokens);
-    let mut ast = AST::new();
-    let stmts = parser.parse(&mut ast)?;
-    let mut interpreter = Interpreter::new();
-
-    interpreter.interpret(&ast, &stmts)?;
-    Ok(())
-}
-
-fn report_error(line: usize, _where: Option<&str>, message: &str) -> String {
+pub fn report_error(line: usize, _where: Option<&str>, message: &str) -> String {
     if let Some(location) = _where {
         format!("[line {line}] Error {location}: {message}")
     } else {

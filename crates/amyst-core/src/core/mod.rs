@@ -5,5 +5,5 @@ pub mod interpreter;
 pub mod parser;
 mod scanner;
 
-pub(crate) use crate::core::parser::Parser;
-pub(crate) use crate::core::scanner::Scanner;
+pub use crate::core::parser::Parser;
+pub use crate::core::scanner::Scanner;
