@@ -10,7 +10,9 @@ como la base de un lenguaje que busca ser rápido, tan simple como el usuario de
 
 ## Estado del proyecto
 
-**En desarrollo activo.** Amyst todavía está tomando forma — la sintaxis y las funcionalidades pueden cambiar sin previo aviso.
+**En desarrollo activo.** Amyst todavía está tomando forma.
+
+*La sintaxis y las funcionalidades pueden cambiar sin previo aviso*.
 
 - [x] Lexer / Scanner
 - [x] Parser (AST)
@@ -29,7 +31,7 @@ Mi abuela me regaló alguna vez un anillo de amatista y mientras buscaba un buen
 
 La amatista es un cuarzo violeta cuyo nombre viene del griego *amethystos*, que significa literalmente
 **"no ebrio"**: los antiguos griegos creían que la piedra protegía contra la embriaguez y traía claridad mental.
-Es una buena metáfora para un lenguaje que aspira a ser claro, directo y sin ruido innecesario —
+Es una buena metáfora para un lenguaje que aspira a ser claro, directo y sin ruido innecesario, 
 tanto en su sintaxis como en cómo se siente escribir en él.
 
 ## Instalación
