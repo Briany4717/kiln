@@ -48,7 +48,6 @@ pub enum TokenType<'a> {
     Unit,
     In,
     Or,
-    Print,
     Return,
     Super,
     This,

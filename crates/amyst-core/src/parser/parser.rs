@@ -54,8 +54,6 @@ impl<'a> Parser<'a> {
     fn statement(&mut self, ast: &mut AST<'a>) -> Result<Stmt<'a>, AmystError<'a>> {
         if self.matches(&[TokenType::For]) {
             self.for_stmt(ast)
-        } else if self.matches(&[TokenType::Print]) {
-            self.print_stmt(ast)
         } else if self.matches(&[TokenType::Return]) {
             self.return_stmt(ast)
         } else if self.matches(&[TokenType::While]) {
@@ -70,33 +68,13 @@ impl<'a> Parser<'a> {
         self.consume(TokenType::In, "Expected 'in'.")?;
 
         let iterable = self.expression(ast)?;
-        let body_stmt = self.statement(ast)?;
+        let body_stmt = Stmt::Expression(self.expression(ast)?);
         let body = ast.add_stmt(body_stmt);
         Ok(Stmt::For {
             variable,
             iterable,
             body,
         })
-    }
-
-    fn if_stmt(&mut self, ast: &mut AST<'a>) -> Result<Stmt<'a>, AmystError<'a>> {
-        let condition = self.expression(ast)?;
-        let then_branch = self.expression(ast)?;
-        let mut else_branch = None;
-        if self.matches(&[TokenType::Else]) {
-            else_branch = Some(self.expression(ast)?);
-        }
-        Ok(Stmt::If(ast.add_node(ExprKind::If {
-            condition,
-            then_branch,
-            else_branch,
-        })))
-    }
-
-    fn print_stmt(&mut self, ast: &mut AST<'a>) -> Result<Stmt<'a>, AmystError<'a>> {
-        let val = self.expression(ast)?;
-        self.consume(TokenType::Semicolon, "Expect ';' after value.")?;
-        Ok(Stmt::Print(val))
     }
 
     fn return_stmt(&mut self, ast: &mut AST<'a>) -> Result<Stmt<'a>, AmystError<'a>> {
@@ -127,7 +105,7 @@ impl<'a> Parser<'a> {
 
     fn while_stmt(&mut self, ast: &mut AST<'a>) -> Result<Stmt<'a>, AmystError<'a>> {
         let condition = self.expression(ast)?;
-        let body_stmt = self.statement(ast)?;
+        let body_stmt = Stmt::Expression(self.expression(ast)?);
         let body = ast.add_stmt(body_stmt);
         Ok(Stmt::While { condition, body })
     }
@@ -224,7 +202,6 @@ impl<'a> Parser<'a> {
                 stmts.push(ast.add_stmt(stmt));
             } else if self.check(&TokenType::For)
                 || self.check(&TokenType::While)
-                || self.check(&TokenType::Print)
                 || self.check(&TokenType::Return)
             {
                 let stmt = self.statement(ast)?;
@@ -247,7 +224,7 @@ impl<'a> Parser<'a> {
                         return Err(AmystError::Runtime {
                             message: report_error(
                                 self.peek().line,
-                                Some(&format!(" at '{}'", self.peek().lexeme)),
+                                Some(&format!("at '{}'", self.peek().lexeme)),
                                 "Expect ';' after expression.",
                             ),
                         });
@@ -541,14 +518,6 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn check_next(&self, t: &TokenType) -> bool {
-        if self.peek_next().token_type == TokenType::Eof {
-            false
-        } else {
-            self.peek_next().token_type == *t
-        }
-    }
-
     fn check(&self, t: &TokenType) -> bool {
         if self.is_at_end() {
             false
@@ -573,10 +542,6 @@ impl<'a> Parser<'a> {
         self.tokens[self.current].clone()
     }
 
-    fn peek_next(&self) -> Token<'a> {
-        self.tokens[self.current + 1].clone()
-    }
-
     fn previous(&self) -> Token<'a> {
         self.tokens[self.current - 1].clone()
     }
@@ -593,7 +558,6 @@ impl<'a> Parser<'a> {
                 | TokenType::For
                 | TokenType::Fn
                 | TokenType::If
-                | TokenType::Print
                 | TokenType::Return
                 | TokenType::Let
                 | TokenType::While => return,

@@ -2,12 +2,14 @@ mod callable;
 mod environment;
 mod value;
 
+use std::io;
+use std::io::Write;
 pub use callable::AmystCallable;
 pub use value::Value;
 
-use crate::ast::{AST, Stmt, StmtId, evaluate};
+use crate::ast::{evaluate, Stmt, StmtId, AST};
 use crate::interpreter::environment::ScopeStack;
-use crate::{AmystError, report_error};
+use crate::{report_error, AmystError};
 use std::time::{SystemTime, UNIX_EPOCH};
 pub struct Interpreter<'a> {
     pub env: ScopeStack<'a>,
@@ -33,6 +35,35 @@ impl<'a> Interpreter<'a> {
             }),
         );
 
+        env.define_global(
+            "print",
+            Value::Callable(AmystCallable::Native {
+                arity: 1,
+                name: "print",
+                func: |args| {
+                    for arg in args{
+                        print!("{arg}");
+                        let _ = io::stdout().flush();
+                    }
+                    Ok(Value::Unit)
+                },
+            }),
+        );
+
+        env.define_global(
+            "println",
+            Value::Callable(AmystCallable::Native {
+                arity: 1,
+                name: "println",
+                func: |args| {
+                    for arg in args{
+                        println!("{}",arg);
+                    }
+                    Ok(Value::Unit)
+                },
+            }),
+        );
+
         Self { env }
     }
 
@@ -52,7 +83,7 @@ impl<'a> Interpreter<'a> {
         match ast.get_stmt(stmt_id) {
             Stmt::Print(id) => {
                 let val = evaluate(ast, self, *id)?;
-                println!("{}", self.stringify(val))
+                println!("{}", val)
             }
             Stmt::Expression(id) => {
                 evaluate(ast, self, *id)?;
@@ -69,7 +100,6 @@ impl<'a> Interpreter<'a> {
                             "Variable should have an initial value.",
                         ),
                     });
-                    self.env.define(name.lexeme, Value::Unit)
                 }
             }
             Stmt::While { condition, body } => {
@@ -139,29 +169,7 @@ impl<'a> Interpreter<'a> {
         Ok(())
     }
 
-    fn stringify(&self, val: Value) -> String {
-        match val {
-            Value::Number(n) => n.to_string(),
-            Value::String(s) => s.to_string(),
-            Value::Boolean(b) => String::from(if b { "true" } else { "false" }),
-            Value::Range {
-                start,
-                end,
-                inclusive,
-            } => {
-                if inclusive {
-                    format!("{start}..={end}")
-                } else {
-                    format!("{start}..{end}")
-                }
-            }
-            Value::Unit => String::from("()"),
-            Value::Callable(func) => match func {
-                AmystCallable::Native { name, .. } => format!("<native fn {name}>"),
-                AmystCallable::UserDefined { name, .. } => format!("<fn {}>", name.lexeme),
-            },
-        }
-    }
+
 }
 
 pub fn is_truthy<'a>(val: &Value) -> Result<bool, AmystError<'a>> {

@@ -3,7 +3,7 @@ use crate::ast::{AST, AmystType, ExprId, Param, evaluate};
 use crate::interpreter::{Interpreter, Value};
 use crate::lexer::Token;
 
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, Debug)]
 pub enum AmystCallable<'a> {
     Native {
         arity: usize,
@@ -48,6 +48,22 @@ impl<'a> AmystCallable<'a> {
         match self {
             AmystCallable::Native { arity, .. } => *arity,
             AmystCallable::UserDefined { params, .. } => params.len(),
+        }
+    }
+}
+
+impl<'a> PartialEq for AmystCallable<'a> {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (
+                Self::Native { arity, name, .. },
+                Self::Native { arity: o_arity, name: o_name, .. },
+            ) => arity == o_arity && name == o_name,
+            (
+                Self::UserDefined { name, params, body, return_type },
+                Self::UserDefined { name: o_name, params: o_params, body: o_body, return_type: o_return_type },
+            ) => name == o_name && params == o_params && body == o_body && return_type == o_return_type,
+            _ => false,
         }
     }
 }

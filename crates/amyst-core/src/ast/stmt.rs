@@ -3,6 +3,7 @@ use crate::lexer::Token;
 
 pub type StmtId = usize;
 
+#[derive(Debug)]
 pub enum Stmt<'a> {
     Block(ExprId),
     Expression(ExprId),
@@ -25,7 +26,7 @@ pub enum Stmt<'a> {
     },
     While {
         condition: ExprId,
-        body: StmtId,
+        body: ExprId,
     },
     Var {
         name: Token<'a>,

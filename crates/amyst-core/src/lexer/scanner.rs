@@ -150,7 +150,6 @@ impl<'a> Scanner<'a> {
             "if" => TokenType::If,
             "in" => TokenType::In,
             "or" => TokenType::Or,
-            "print" => TokenType::Print,
             "return" => TokenType::Return,
             "super" => TokenType::Super,
             "this" => TokenType::This,
