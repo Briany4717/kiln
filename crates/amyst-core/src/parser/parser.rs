@@ -70,6 +70,9 @@ impl<'a> Parser<'a> {
         let iterable = self.expression(ast)?;
         let body_stmt = Stmt::Expression(self.expression(ast)?);
         let body = ast.add_stmt(body_stmt);
+        if self.matches(&[TokenType::Semicolon]) {
+            // Warning TODO: Emit warning "unnecessary trailing semicolon after 'while' block"
+        }
         Ok(Stmt::For {
             variable,
             iterable,
@@ -107,6 +110,9 @@ impl<'a> Parser<'a> {
         let condition = self.expression(ast)?;
         let body_stmt = Stmt::Expression(self.expression(ast)?);
         let body = ast.add_stmt(body_stmt);
+        if self.matches(&[TokenType::Semicolon]) {
+            // Warning TODO: Emit warning "unnecessary trailing semicolon after 'while' block"
+        }
         Ok(Stmt::While { condition, body })
     }
 
